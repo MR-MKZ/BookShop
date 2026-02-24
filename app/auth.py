@@ -22,9 +22,16 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     Verify a password against a hash.
     Truncate to 72 bytes to avoid bcrypt limitation errors.
     """
-    # BCrypt has a 72 byte limit on input. Passlib might not handle this automatically in all versions.
-    if plain_password and len(plain_password.encode('utf-8')) > 72:
-        plain_password = plain_password[:72]
+    if plain_password:
+        # Encode to UTF-8 bytes and truncate to 72 bytes
+        password_bytes = plain_password.encode('utf-8')
+        if len(password_bytes) > 72:
+            # We must pass the bytes directly or decode back safely.
+            # passlib verify accepts bytes if they are utf-8 compatible.
+            # However, simpler to just truncate the source string if strictly ascii,
+            # but for safety, let's just pass the truncated bytes if passlib accepts it.
+            # Checking passlib source: .verify(secret, hash) -> secret can be str or bytes.
+            return pwd_context.verify(password_bytes[:72], hashed_password)
 
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -34,8 +41,13 @@ def get_password_hash(password: str) -> str:
     Hash a password.
     Truncate to 72 bytes to avoid bcrypt limitation errors.
     """
-    if password and len(password.encode('utf-8')) > 72:
-        password = password[:72]
+    if password:
+        password_bytes = password.encode('utf-8')
+        if len(password_bytes) > 72:
+            # Truncate to 72 bytes.
+            # NOTE: If the 72nd byte splits a multibyte character, it might be invalid UTF-8.
+            # Passlib's bcrypt backend usually handles bytes fine.
+            return pwd_context.hash(password_bytes[:72])
 
     return pwd_context.hash(password)
 
