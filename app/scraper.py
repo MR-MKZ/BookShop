@@ -4,6 +4,7 @@ import logging
 import re
 import sys
 import os
+import hashlib
 
 import aiohttp
 import asyncpg
@@ -281,7 +282,8 @@ class BookScraper:
                     description = desc_tag.text.strip() if desc_tag else ""
 
                     title = info.get("عنوان فارسی", "Unknown")
-                    folder_name = self.sanitize_filename(title)
+                    # Make folder_name unique by appending md5 of url
+                    folder_name = self.sanitize_filename(title) + "_" + hashlib.md5(url.encode()).hexdigest()[:6]
 
                     data = {
                         "url": url,
