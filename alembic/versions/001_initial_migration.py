@@ -16,12 +16,22 @@ branch_labels = None
 depends_on = None
 
 def upgrade() -> None:
-    # Create ENUM types manually to handle existence check
-    userrole = postgresql.ENUM('ADMIN', 'USER', name='userrole')
-    userrole.create(op.get_bind(), checkfirst=True)
+    # Use raw SQL to create types safely
+    # This avoids sqlalchemy trying to create them again when they are used in columns
+    conn = op.get_bind()
 
-    orderstatus = postgresql.ENUM('PENDING', 'PAID', 'FAILED', 'CANCELLED', name='orderstatus')
-    orderstatus.create(op.get_bind(), checkfirst=True)
+    # UserRole Enum
+    try:
+        conn.execute(sa.text("CREATE TYPE userrole AS ENUM ('ADMIN', 'USER')"))
+    except Exception:
+        # Ignore if exists (Checking via exception is safer across different PG versions/drivers than querying pg_type manually here)
+        pass
+
+    # OrderStatus Enum
+    try:
+        conn.execute(sa.text("CREATE TYPE orderstatus AS ENUM ('PENDING', 'PAID', 'FAILED', 'CANCELLED')"))
+    except Exception:
+        pass
 
     # Users
     op.create_table('users',
@@ -32,7 +42,8 @@ def upgrade() -> None:
         sa.Column('full_name', sa.String(), nullable=True),
         sa.Column('phone', sa.String(), nullable=True),
         sa.Column('is_active', sa.Boolean(), nullable=True),
-        sa.Column('role', sa.Enum('ADMIN', 'USER', name='userrole'), nullable=True),
+        # Use postgresql.ENUM with create_type=False since we handled creation above
+        sa.Column('role', postgresql.ENUM('ADMIN', 'USER', name='userrole', create_type=False), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
@@ -68,7 +79,8 @@ def upgrade() -> None:
     op.create_table('orders',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=True),
-        sa.Column('status', sa.Enum('PENDING', 'PAID', 'FAILED', 'CANCELLED', name='orderstatus'), nullable=True),
+        # Use postgresql.ENUM with create_type=False
+        sa.Column('status', postgresql.ENUM('PENDING', 'PAID', 'FAILED', 'CANCELLED', name='orderstatus', create_type=False), nullable=True),
         sa.Column('total_amount', sa.Numeric(precision=10, scale=2), nullable=True),
         sa.Column('payment_gateway_transaction_id', sa.String(), nullable=True),
         sa.Column('payment_gateway_ref_id', sa.String(), nullable=True),
@@ -152,5 +164,5 @@ def downgrade() -> None:
     op.drop_table('users')
 
     # Drop types if needed (careful in production)
-    postgresql.ENUM(name='userrole').drop(op.get_bind(), checkfirst=True)
-    postgresql.ENUM(name='orderstatus').drop(op.get_bind(), checkfirst=True)
+    # op.execute("DROP TYPE IF EXISTS userrole")
+    # op.execute("DROP TYPE IF EXISTS orderstatus")
