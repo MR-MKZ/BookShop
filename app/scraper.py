@@ -410,13 +410,11 @@ class BookScraper:
             self.db_queue.task_done()
 
             if len(batch) >= 200:
-                # await self.save_batch(batch) # Commented out for debugging
-                logger.info(f"DB: Mock Save {len(batch)} books")
+                await self.save_batch(batch)
                 batch = []
 
         if batch:
-            # await self.save_batch(batch) # Commented out for debugging
-            logger.info(f"DB: Mock Save {len(batch)} books")
+            await self.save_batch(batch)
 
     async def save_batch(self, batch):
         try:
