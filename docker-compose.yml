@@ -1,4 +1,5 @@
 services:
+  # Database Service
   db:
     profiles: ["dev", "prod", "scraper"]
     image: postgres:15-alpine
@@ -8,14 +9,15 @@ services:
     env_file:
       - .env
     ports:
-      - "5432:5432" 
+      - "5432:5432"
     networks:
       - kabana_net
     restart: always
 
+  # Development Web Service (FastAPI + Hot Reload)
   web:
     profiles: ["dev"]
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.dev
     container_name: kabana_web_dev
@@ -31,7 +33,9 @@ services:
     depends_on:
       - db
       - ftp
+    command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
+  # Admin Tools
   pgadmin:
     profiles: ["dev"]
     image: dpage/pgadmin4
@@ -45,6 +49,7 @@ services:
     depends_on:
       - db
 
+  # FTP Server (Development)
   ftp:
     profiles: ["dev"]
     image: fauria/vsftpd
@@ -54,7 +59,8 @@ services:
     environment:
       - PASV_MIN_PORT=21100
       - PASV_MAX_PORT=21110
-      - LOCAL_UMASK=022 # این خط اضافه شد تا فایل‌های جدید توسط بقیه سرویس‌ها قابل خواندن باشند
+      - LOCAL_UMASK=022
+      # Ensure FTP user matches env vars if needed, though fauria/vsftpd uses FTP_USER/FTP_PASS
     volumes:
       - ./storage:/home/vsftpd/ftp_user
     ports:
@@ -64,25 +70,26 @@ services:
     networks:
       - kabana_net
 
-  # --- File Manager (Web Interface for files) ---
+  # File Manager (Web Interface for files)
   filemanager:
     profiles: ["dev"]
     image: filebrowser/filebrowser
     container_name: kabana_filemanager
     volumes:
-      - ./storage:/srv               # اتصال پوشه فایل‌ها
-      - filebrowser_data:/database   # دیتابیس داخلی فایل‌منیجر
+      - ./storage:/srv
+      - filebrowser_data:/database
     environment:
       - FB_DATABASE=/database/filebrowser.db
       - FB_ROOT=/srv
     ports:
-      - "8080:80" # دسترسی از طریق پورت 8080
+      - "8080:80"
     networks:
       - kabana_net
 
+  # Production Web Service
   web_prod:
     profiles: ["prod"]
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile.prod
     container_name: kabana_web_prod
@@ -95,7 +102,9 @@ services:
     depends_on:
       - db
     restart: always
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 
+  # Nginx Reverse Proxy (Production)
   nginx:
     profiles: ["prod"]
     image: nginx:alpine
@@ -114,13 +123,15 @@ services:
       - web_prod
     restart: always
 
+  # Scraper Service
   scraper:
     profiles: ["prod", "scraper"]
     build:
       context: .
       dockerfile: Dockerfile
     container_name: kabana_scraper
-    command: python /app/app/scraper.py
+    # Override command to run the scraper script
+    command: python app/scraper.py
     volumes:
       - .:/app
       - ./storage:/app/storage
@@ -133,7 +144,7 @@ services:
 
 volumes:
   postgres_data:
-  filebrowser_data: # والیوم جدید برای دیتابیس فایل منیجر
+  filebrowser_data:
 
 networks:
   kabana_net:

@@ -4,15 +4,16 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import get_db
+from app.database import get_async_db
 from app.models import Book
+from app.routers.media import signer  # Import signer for token generation
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
 @router.get("/")
-async def home(request: Request, db: AsyncSession = Depends(get_db)):
+async def home(request: Request, db: AsyncSession = Depends(get_async_db)):
     result = await db.execute(
         select(Book)
         .where(Book.is_active == True)
@@ -27,7 +28,7 @@ async def home(request: Request, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/search")
-async def search(request: Request, q: str = "", db: AsyncSession = Depends(get_db)):
+async def search(request: Request, q: str = "", db: AsyncSession = Depends(get_async_db)):
     if not q:
         return templates.TemplateResponse(
             "search_results.html", {"request": request, "books": [], "query": ""}
@@ -56,7 +57,7 @@ async def search(request: Request, q: str = "", db: AsyncSession = Depends(get_d
 
 @router.get("/book/{book_id}")
 async def book_detail(
-    book_id: int, request: Request, db: AsyncSession = Depends(get_db)
+    book_id: int, request: Request, db: AsyncSession = Depends(get_async_db)
 ):
     result = await db.execute(select(Book).where(Book.id == book_id))
     book = result.scalar_one_or_none()
@@ -64,13 +65,21 @@ async def book_detail(
     if not book:
         raise HTTPException(status_code=404, detail="Book not found")
 
-    return templates.TemplateResponse(
-        "detail.html", {"request": request, "book": book, "query": ""}
+    # Generate Secure Token for Download Link
+    # We pass 'folder' and 'filename' to be validated later
+    filename = f"{book.folder_name}.{book.file_format}"
+    token = signer.dumps(
+        {"folder": book.folder_name, "filename": filename},
+        salt="pdf-download"
     )
 
-
-@router.post("/cart/add/{book_id}")
-async def add_to_cart(book_id: int, request: Request):
-    # اینجا بعدا لاجیک سبد خرید را کامل می‌کنیم
-    # فعلا ریدایرکت به صفحه اصلی
-    return RedirectResponse(url="/", status_code=303)
+    return templates.TemplateResponse(
+        "detail.html",
+        {
+            "request": request,
+            "book": book,
+            "token": token,
+            "filename": filename,
+            "query": ""
+        }
+    )

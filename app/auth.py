@@ -1,17 +1,20 @@
 from datetime import datetime, timedelta
+from typing import Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.security.utils import get_authorization_scheme_param
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.database import get_db
+from app.database import get_async_db
 from app.models import User, UserRole
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -40,13 +43,13 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 
-def authenticate_user(db: Session, username: str, password: str) -> User | None:
+async def authenticate_user(db: AsyncSession, username: str, password: str) -> User | None:
     """Authenticate a user"""
-    user = (
-        db.query(User)
-        .filter((User.username == username) | (User.email == username))
-        .first()
+    result = await db.execute(
+        select(User).where((User.username == username) | (User.email == username))
     )
+    user = result.scalar_one_or_none()
+
     if not user:
         return None
     if not verify_password(password, user.hashed_password):
@@ -55,14 +58,30 @@ def authenticate_user(db: Session, username: str, password: str) -> User | None:
 
 
 async def get_current_user(
-    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+    request: Request,
+    token: Optional[str] = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_async_db)
 ) -> User:
-    """Get current authenticated user"""
+    """Get current authenticated user from Header or Cookie"""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    # Try to get token from cookie if not in header
+    if not token:
+        cookie_authorization: str = request.cookies.get("access_token")
+        if cookie_authorization:
+            scheme, param = get_authorization_scheme_param(cookie_authorization)
+            if scheme.lower() == "bearer":
+                token = param
+            else:
+                 token = cookie_authorization # Fallback if just token string
+
+    if not token:
+        raise credentials_exception
+
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
@@ -72,7 +91,10 @@ async def get_current_user(
             raise credentials_exception
     except JWTError:
         raise credentials_exception
-    user = db.query(User).filter(User.username == username).first()
+
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
+
     if user is None:
         raise credentials_exception
     return user

@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}کابانا - {{ book.title }}{% endblock %}
+
+{% block content %}
+<div class="breadcrumb-items">
+    <div class="row">
+        <ul class="breadcrumb">
+            <li>
+                <a href="/" class="breadcrumb-link">صفحه اصلی</a>
+            </li>
+            <li class="chevron"><span class="fa fa-chevron-left"></span></li>
+            <li>
+                <span class="breadcrumb-active">{{ book.title }}</span>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<div class="book-details">
+    <div class="container">
+        <div class="row">
+            <div class="col-xl-12">
+                <div class="row">
+                    <div class="col-xl-12">
+
+                        <div class="single-book d-flex align-items-center mb-0">
+                            <div class="book-img">
+                                <img src="/media/proxy/cover/{{ book.folder_name }}/cover.jpg"
+                                     alt="{{ book.title }}"
+                                     onerror="this.src='{{ url_for('static', path='img/book/default.jpg') }}'"
+                                     style="max-width: 300px;">
+                            </div>
+                            <div class="book-caption">
+                                <h3>{{ book.title }}</h3>
+
+                                <div class="review">
+                                    <div class="rating">
+                                        <i class="fas fa-star"></i>
+                                        <i class="fas fa-star"></i>
+                                        <i class="fas fa-star"></i>
+                                        <i class="fas fa-star"></i>
+                                        <i class="fas fa-star-half-alt"></i>
+                                    </div>
+                                    <!-- Placeholder for reviews -->
+                                    <p>(<span>0</span> نظر)</p>
+                                </div>
+
+                                <p>نویسنده: <a href="#">{{ book.author }}</a></p>
+                                {% if book.publisher %}
+                                <p>ناشر: <a href="#">{{ book.publisher }}</a></p>
+                                {% endif %}
+                                <div class="price">
+                                    <p>{{ "{:,.0f}".format(book.price|float) if book.price else "رایگان" }} <span>تومان</span></p>
+                                </div>
+
+                                <!-- Secure Download Link -->
+                                <a href="/media/proxy/book/{{ book.folder_name }}/{{ filename }}?token={{ token }}" class="btn btn-primary mr-10">
+                                    دانلود فایل ({{ book.file_format }})
+                                </a>
+
+                                <!-- Placeholder buttons -->
+                                <a href="#" class="border-btn book-btn share-btn"><i class="fas fa-share-alt"></i></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="our-client section-padding best-selling">
+    <div class="container">
+        <div class="row">
+            <div class="offset-xl-1 col-xl-10">
+                <div class="nav-button f-right">
+                    <nav>
+                        <div class="nav nav-tabs " id="nav-tab" role="tablist">
+                            <a class="nav-link active" id="nav-one-tab" data-bs-toggle="tab" href="#nav-one"
+                                role="tab" aria-controls="nav-one" aria-selected="true">توضیحات</a>
+                            <a class="nav-link" id="nav-two-tab" data-bs-toggle="tab" href="#nav-two" role="tab"
+                                aria-controls="nav-two" aria-selected="false">مشخصات کتاب</a>
+                        </div>
+                    </nav>
+
+                </div>
+            </div>
+        </div>
+        <div class="container">
+
+            <div class="tab-content" id="nav-tabContent">
+                <div class="tab-pane fade show active" id="nav-one" role="tabpanel" aria-labelledby="nav-one-tab">
+                    <div class="row">
+                        <div class="desc-tab offset-xl-1 col-lg-9">
+                            <p>{{ book.description | default('توضیحاتی برای این کتاب ثبت نشده است.', true) }}</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="nav-two" role="tabpanel" aria-labelledby="nav-two-tab">
+                    <div class="row">
+                        <div class="table-book offset-xl-1 col-lg-9">
+                            <table class="details">
+                                <thead>
+                                    <tr>
+                                        <th class="first">نام کتاب</th>
+                                        <th class="second">{{ book.title }}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="first">نویسنده</td>
+                                        <td class="second">{{ book.author }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="first">ناشر</td>
+                                        <td class="second">{{ book.publisher }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="first">شابک</td>
+                                        <td class="second">{{ book.isbn }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="first">فرمت</td>
+                                        <td class="second">{{ book.file_format }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

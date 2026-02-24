@@ -9,10 +9,12 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    Index
 )
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from sqlalchemy.dialects.postgresql import TSVECTOR
 
 from app.database import Base
 
@@ -33,33 +35,31 @@ class Book(Base):
     __tablename__ = "books"
 
     id = Column(Integer, primary_key=True, index=True)
-    url = Column(String, unique=True, index=True)
-    title_fa = Column(String)
-    title_en = Column(String)
-    author = Column(String)
-    publisher = Column(String)
-    isbn = Column(String)
-    publish_year = Column(String)
-    language = Column(String)
-    pages = Column(String)
-    file_format = Column(String)
-    file_size = Column(String)
-    edition = Column(String)
-    price = Column(String)
-    availability = Column(String)
-    amazon_link = Column(String)
-    image_url = Column(String)
+    title = Column(String, index=True)
+    author = Column(String, index=True)
+    publisher = Column(String, index=True)
+    isbn = Column(String, index=True)
     description = Column(Text)
+    price = Column(Numeric(10, 2))
 
-    # Additional fields for digital book store
-    ftp_path = Column(String)  # Path to book file on FTP server
+    # File Management
+    folder_name = Column(String, unique=True, index=True)  # Used for file paths/FTP
+    file_format = Column(String, default="pdf")
+
+    # Status
     is_active = Column(Boolean, default=True)
-    category = Column(String)
+
+    # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     order_items = relationship("OrderItem", back_populates="book")
+
+    # Composite Index for Search
+    __table_args__ = (
+        Index('ix_books_search_composite', 'title', 'author', 'publisher', postgresql_using='btree'),
+    )
 
 
 class User(Base):
@@ -87,10 +87,10 @@ class Order(Base):
     user_id = Column(Integer, ForeignKey("users.id"))
     status = Column(SQLEnum(OrderStatus), default=OrderStatus.PENDING)
     total_amount = Column(Numeric(10, 2))
-    payment_gateway_transaction_id = Column(String)
-    payment_gateway_ref_id = Column(String)
+    payment_gateway_transaction_id = Column(String, nullable=True)
+    payment_gateway_ref_id = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    paid_at = Column(DateTime(timezone=True))
+    paid_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     user = relationship("User", back_populates="orders")
@@ -123,7 +123,7 @@ class DownloadLink(Base):
     is_used = Column(Boolean, default=False)
     expires_at = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    used_at = Column(DateTime(timezone=True))
+    used_at = Column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     user = relationship("User", back_populates="download_links")
@@ -136,7 +136,7 @@ class Cart(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    session_id = Column(String, index=True)  # For anonymous users
+    session_id = Column(String, index=True, nullable=True)
     book_id = Column(Integer, ForeignKey("books.id"))
     quantity = Column(Integer, default=1)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

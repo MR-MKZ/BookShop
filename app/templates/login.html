@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}ورود به حساب کاربری{% endblock %}
+
+{% block content %}
+<div class="login-bg" style="padding: 100px 0;">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-xl-6 col-lg-7 col-md-10">
+                <div class="login-form-area">
+                    <form class="login-form" action="/auth/login" method="post">
+                        <div class="login-heading">
+                            <span>ورود</span>
+                            <p>برای دسترسی به سایت وارد شوید</p>
+                        </div>
+
+                        {% if error %}
+                        <div class="alert alert-danger">{{ error }}</div>
+                        {% endif %}
+
+                        <div class="input-box">
+                            <div class="single-input-fields">
+                                <label>نام کاربری</label>
+                                <input type="text" name="username" placeholder="نام کاربری" required>
+                            </div>
+                            <div class="single-input-fields">
+                                <label>رمز عبور</label>
+                                <input type="password" name="password" placeholder="رمز عبور" required>
+                            </div>
+                            <div class="single-input-fields login-check">
+                                <input type="checkbox" id="fruit1" name="keep-log">
+                                <label for="fruit1">مرا به یاد داشته باش!</label>
+                                <a href="#" class="f-right">رمز خود را فراموش کرده اید؟</a>
+                            </div>
+                        </div>
+
+                        <div class="login-footer">
+                            <p>حساب کاربری ندارید؟ <a href="/auth/register">ثبت نام</a> کنید.</p>
+                            <button class="submit-btn3">ورود</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
