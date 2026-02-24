@@ -1,5 +1,8 @@
 from datetime import datetime, timedelta
 from typing import Optional
+import bcrypt
+import hashlib
+import base64
 
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
@@ -16,40 +19,62 @@ from app.models import User, UserRole
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """
-    Verify a password against a hash.
-    Truncate to 72 bytes to avoid bcrypt limitation errors.
-    """
-    if plain_password:
-        # Encode to UTF-8 bytes and truncate to 72 bytes
-        password_bytes = plain_password.encode('utf-8')
-        if len(password_bytes) > 72:
-            # We must pass the bytes directly or decode back safely.
-            # passlib verify accepts bytes if they are utf-8 compatible.
-            # However, simpler to just truncate the source string if strictly ascii,
-            # but for safety, let's just pass the truncated bytes if passlib accepts it.
-            # Checking passlib source: .verify(secret, hash) -> secret can be str or bytes.
-            return pwd_context.verify(password_bytes[:72], hashed_password)
-
-    return pwd_context.verify(plain_password, hashed_password)
-
-
 def get_password_hash(password: str) -> str:
     """
-    Hash a password.
-    Truncate to 72 bytes to avoid bcrypt limitation errors.
+    Hash a password using bcrypt.
+    Pre-hashes with SHA-256 to safely bypass the 72-byte limit without truncating.
     """
-    if password:
-        password_bytes = password.encode('utf-8')
-        if len(password_bytes) > 72:
-            # Truncate to 72 bytes.
-            # NOTE: If the 72nd byte splits a multibyte character, it might be invalid UTF-8.
-            # Passlib's bcrypt backend usually handles bytes fine.
-            return pwd_context.hash(password_bytes[:72])
+    if not password:
+        raise ValueError("Password cannot be empty")
+        
+    # Standard practice: Pre-hash the password to avoid the 72-byte limit
+    # and prevent cutting off multibyte UTF-8 characters midway.
+    b64_hash = base64.b64encode(hashlib.sha256(password.encode('utf-8')).digest())
+    
+    # Generate salt and hash
+    salt = bcrypt.gensalt()
+    hashed_bytes = bcrypt.hashpw(b64_hash, salt)
+    
+    return hashed_bytes.decode('utf-8')
 
-    return pwd_context.hash(password)
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    b64_hash = base64.b64encode(hashlib.sha256(plain_password.encode('utf-8')).digest())
+    return bcrypt.checkpw(b64_hash, hashed_password.encode('utf-8'))
+
+
+# def verify_password(plain_password: str, hashed_password: str) -> bool:
+#     """
+#     Verify a password against a hash.
+#     Truncate to 72 bytes to avoid bcrypt limitation errors.
+#     """
+#     if plain_password:
+#         # Encode to UTF-8 bytes and truncate to 72 bytes
+#         password_bytes = plain_password.encode('utf-8')
+#         if len(password_bytes) > 72:
+#             # We must pass the bytes directly or decode back safely.
+#             # passlib verify accepts bytes if they are utf-8 compatible.
+#             # However, simpler to just truncate the source string if strictly ascii,
+#             # but for safety, let's just pass the truncated bytes if passlib accepts it.
+#             # Checking passlib source: .verify(secret, hash) -> secret can be str or bytes.
+#             return pwd_context.verify(password_bytes[:72], hashed_password)
+
+#     return pwd_context.verify(plain_password, hashed_password)
+
+
+# def get_password_hash(password: str) -> str:
+#     """
+#     Hash a password.
+#     Truncate to 72 bytes to avoid bcrypt limitation errors.
+#     """
+#     if password:
+#         password_bytes = password.encode('utf-8')
+#         if len(password_bytes) > 72:
+#             # Truncate to 72 bytes.
+#             # NOTE: If the 72nd byte splits a multibyte character, it might be invalid UTF-8.
+#             # Passlib's bcrypt backend usually handles bytes fine.
+#             return pwd_context.hash(password_bytes[:72])
+
+#     return pwd_context.hash(password)
 
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
