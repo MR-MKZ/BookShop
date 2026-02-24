@@ -59,19 +59,30 @@ def upgrade() -> None:
     # Books
     op.create_table('books',
         sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('url', sa.String(), nullable=True),
         sa.Column('title', sa.String(), nullable=True),
+        sa.Column('title_en', sa.String(), nullable=True),
         sa.Column('author', sa.String(), nullable=True),
         sa.Column('publisher', sa.String(), nullable=True),
         sa.Column('isbn', sa.String(), nullable=True),
-        sa.Column('description', sa.Text(), nullable=True),
-        sa.Column('price', sa.Numeric(precision=10, scale=2), nullable=True),
-        sa.Column('folder_name', sa.String(), nullable=True),
+        sa.Column('publish_year', sa.String(), nullable=True),
+        sa.Column('language', sa.String(), nullable=True),
+        sa.Column('pages', sa.String(), nullable=True),
         sa.Column('file_format', sa.String(), nullable=True),
+        sa.Column('file_size', sa.String(), nullable=True),
+        sa.Column('edition', sa.String(), nullable=True),
+        sa.Column('price', sa.Numeric(precision=10, scale=2), nullable=True),
+        sa.Column('availability', sa.String(), nullable=True),
+        sa.Column('amazon_link', sa.String(), nullable=True),
+        sa.Column('image_url', sa.String(), nullable=True),
+        sa.Column('description', sa.Text(), nullable=True),
+        sa.Column('folder_name', sa.String(), nullable=True),
         sa.Column('is_active', sa.Boolean(), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=True),
         sa.PrimaryKeyConstraint('id')
     )
+    op.create_index(op.f('ix_books_url'), 'books', ['url'], unique=True)
     op.create_index(op.f('ix_books_author'), 'books', ['author'], unique=False)
     op.create_index(op.f('ix_books_folder_name'), 'books', ['folder_name'], unique=True)
     op.create_index(op.f('ix_books_id'), 'books', ['id'], unique=False)
@@ -162,6 +173,7 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_books_id'), table_name='books')
     op.drop_index(op.f('ix_books_folder_name'), table_name='books')
     op.drop_index(op.f('ix_books_author'), table_name='books')
+    op.drop_index(op.f('ix_books_url'), table_name='books')
     op.drop_table('books')
     op.drop_index(op.f('ix_users_username'), table_name='users')
     op.drop_index(op.f('ix_users_id'), table_name='users')
