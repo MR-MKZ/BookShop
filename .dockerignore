@@ -2,7 +2,6 @@ storage/
 postgres_data/
 nginx/ssl/
 __pycache__/
-.env
 .venv/
 .git/
 alembic/versions/

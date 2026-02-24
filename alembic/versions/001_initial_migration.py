@@ -7,7 +7,7 @@ Create Date: 2023-10-27 10:00:00.000000
 """
 from alembic import op
 import sqlalchemy as sa
-
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'a1b2c3d4e5f6'
@@ -16,6 +16,13 @@ branch_labels = None
 depends_on = None
 
 def upgrade() -> None:
+    # Create ENUM types manually to handle existence check
+    userrole = postgresql.ENUM('ADMIN', 'USER', name='userrole')
+    userrole.create(op.get_bind(), checkfirst=True)
+
+    orderstatus = postgresql.ENUM('PENDING', 'PAID', 'FAILED', 'CANCELLED', name='orderstatus')
+    orderstatus.create(op.get_bind(), checkfirst=True)
+
     # Users
     op.create_table('users',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -143,3 +150,7 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_users_id'), table_name='users')
     op.drop_index(op.f('ix_users_email'), table_name='users')
     op.drop_table('users')
+
+    # Drop types if needed (careful in production)
+    postgresql.ENUM(name='userrole').drop(op.get_bind(), checkfirst=True)
+    postgresql.ENUM(name='orderstatus').drop(op.get_bind(), checkfirst=True)
