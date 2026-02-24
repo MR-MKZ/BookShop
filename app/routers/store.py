@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -7,15 +8,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_async_db
 from app.models import Book, User
 from app.routers.media import signer  # Import signer for token generation
-from app.auth import get_current_user
+from app.auth import get_current_user, oauth2_scheme
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 # Helper to get user optionally
-async def get_current_user_optional(request: Request, db: AsyncSession = Depends(get_async_db)) -> User | None:
+# Fix: Must inject token here to pass it to get_current_user, otherwise get_current_user gets Depends object as default
+async def get_current_user_optional(
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+    token: Optional[str] = Depends(oauth2_scheme)
+) -> User | None:
     try:
-        return await get_current_user(request=request, db=db)
+        return await get_current_user(request=request, token=token, db=db)
     except HTTPException:
         return None
 
