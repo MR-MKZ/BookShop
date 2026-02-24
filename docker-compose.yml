@@ -1,7 +1,7 @@
 services:
   # Database Service
   db:
-    profiles: ["dev", "prod"]
+    profiles: ["dev", "prod", "scraper"]
     image: postgres:15-alpine
     container_name: kabana_db
     volumes:
@@ -139,6 +139,8 @@ services:
       - .env
     networks:
       - kabana_net
+    depends_on:
+      - db
 
 volumes:
   postgres_data:
