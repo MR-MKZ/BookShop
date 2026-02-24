@@ -42,8 +42,8 @@
                                 </a>
                             </div>
                             <div class="properties-caption">
-                                <h3><a href="/book/{{ book.id }}">{{ book.title }}</a></h3>
-                                <a href="#" class="author">{{ book.author }}</a>
+                                <h3 class="text-truncate"><a href="/book/{{ book.id }}">{{ book.title }}</a></h3>
+                                <a href="#" class="author text-truncate d-block">{{ book.author }}</a>
                                 <div class="properties-footer">
                                     <div class="price">
                                         <p>{{ "{:,.0f}".format(book.price|float) if book.price else "رایگان" }} <span>تومان</span></p>
@@ -63,4 +63,15 @@
         </div>
     </div>
 </div>
+
+<style>
+    .text-truncate {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .properties-caption h3 {
+        min-height: 2em; /* Ensure consistent height */
+    }
+</style>
 {% endblock %}
