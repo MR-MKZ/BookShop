@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}پروفایل کاربری{% endblock %}
+
+{% block content %}
+<div class="slider-area ">
+    <div class="single-slider slider-height2 d-flex align-items-center">
+        <div class="container">
+            <div class="row">
+                <div class="col-xl-12">
+                    <div class="hero-cap text-center">
+                        <h2>پروفایل کاربری</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section-padding">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 offset-lg-2">
+                <div class="card">
+                    <div class="card-header">
+                        اطلاعات حساب
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ current_user.full_name }}</h5>
+                        <p class="card-text"><strong>نام کاربری:</strong> {{ current_user.username }}</p>
+                        <p class="card-text"><strong>ایمیل:</strong> {{ current_user.email }}</p>
+                        <p class="card-text"><strong>تلفن:</strong> {{ current_user.phone or 'ثبت نشده' }}</p>
+                        <p class="card-text"><strong>نقش:</strong> {{ current_user.role }}</p>
+                        <a href="/auth/logout" class="btn btn-danger">خروج</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

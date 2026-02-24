@@ -3,7 +3,7 @@ import re
 import aiofiles
 import aioftp
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from app.config import settings
@@ -50,6 +50,10 @@ async def stream_media(folder_name: str, filename: str):
              return
 
         if not os.path.exists(full_path):
+            # Signal caller that file is missing by yielding nothing or handling exception
+            # Generators can't easily raise HTTP exceptions that propagate cleanly to response status
+            # if headers are already sent, but for StreamingResponse, if we yield nothing, it sends 200 OK empty.
+            # We need to check existence BEFORE calling this in the route for 404.
             yield b""
             return
 
@@ -78,6 +82,31 @@ async def stream_media(folder_name: str, filename: str):
             yield b""
 
 
+async def check_file_exists(folder_name: str, filename: str) -> bool:
+    """Check if file exists (Local or FTP)"""
+    if not settings.FTP_ENABLED:
+        full_path = os.path.join(settings.MEDIA_ROOT, folder_name, filename)
+        return os.path.exists(full_path)
+    else:
+        try:
+            async with aioftp.Client.context(
+                host=settings.FTP_HOST,
+                port=settings.FTP_PORT,
+                user=settings.FTP_USER,
+                password=settings.FTP_PASS,
+                socket_timeout=5,
+            ) as client:
+                file_path = f"{folder_name}/{filename}"
+                # aioftp doesn't have a simple exists(), try stat or listing
+                try:
+                    await client.stat(file_path)
+                    return True
+                except:
+                    return False
+        except:
+            return False
+
+
 @router.get("/cover/{folder_name}/{filename}")
 async def proxy_cover(folder_name: str, filename: str):
     """
@@ -88,6 +117,10 @@ async def proxy_cover(folder_name: str, filename: str):
     _, ext = os.path.splitext(filename.lower())
     if ext not in allowed_exts:
         raise HTTPException(status_code=403, detail="Invalid media type")
+
+    # Check existence to avoid 200 OK with empty body / infinite reloads
+    if not await check_file_exists(folder_name, filename):
+        return Response(status_code=404)
 
     media_type = "image/jpeg"
     if ext == ".png":
@@ -115,6 +148,9 @@ async def proxy_book(folder_name: str, filename: str, token: str = Query(...)):
         raise HTTPException(status_code=403, detail="Download link expired.")
     except BadSignature:
         raise HTTPException(status_code=403, detail="Invalid token.")
+
+    if not await check_file_exists(folder_name, filename):
+        raise HTTPException(status_code=404, detail="File not found")
 
     return StreamingResponse(
         stream_media(folder_name, filename),
