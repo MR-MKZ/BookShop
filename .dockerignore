@@ -1,0 +1,17 @@
+storage/
+media/
+postgres_data/
+ftp_data/
+
+.git/
+.gitignore
+.idea/
+.vscode/
+
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env.*

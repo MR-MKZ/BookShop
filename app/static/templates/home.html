@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Slider Area -->
+<div class="slider-area">
+    <div class="container">
+        <div class="row">
+            <div class="col-xl-12">
+                <div class="hero__caption">
+                    <h1 data-animation="fadeInUp" data-delay=".4s">کتاب‌های برگزیده<br> این ماه را از دست ندهید</h1>
+                    <a href="#" class="btn hero-btn" data-animation="fadeInUp" data-delay=".8s">خرید کنید</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Slider Area End -->
+
+<!-- Best Selling Start -->
+<div class="best-selling section-bg">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-xl-7 col-lg-8">
+                <div class="section-tittle text-center mb-55">
+                    <h2>کتاب‌های جدید</h2>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-xl-12">
+                <div class="selling-active">
+                    <!-- Loop through books -->
+                    {% for book in books %}
+                    <div class="properties pb-20">
+                        <div class="properties-card">
+                            <div class="properties-img">
+                                <!-- لینک عکس از پوشه مدیا -->
+                                <a href="/book/{{ book.id }}">
+                                    <img src="/media/{{ book.folder_name }}/cover.jpg" alt="{{ book.title }}" onerror="this.src='{{ url_for('static', path='img/book/best_selling1.jpg') }}'">
+                                </a>
+                            </div>
+                            <div class="properties-caption text-center">
+                                <h3><a href="/book/{{ book.id }}">{{ book.title }}</a></h3>
+                                <p>{{ book.author }}</p>
+                                <div class="properties-footer d-flex justify-content-between align-items-center">
+                                    <div class="price">
+                                        <span>{{ "{:,.0f}".format(book.price) }} تومان</span>
+                                    </div>
+                                </div>
+                                <a href="/book/{{ book.id }}" class="border-btn border-btn2">مشاهده جزئیات</a>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Best Selling End -->
+
+<!-- Subscribe Area -->
+<div class="subscribe-area section-bg2" data-background="{{ url_for('static', path='img/bg/media-bg.jpg') }}">
+    <div class="container">
+        <div class="row">
+            <div class="col-xl-6 col-lg-8 col-md-9">
+                <div class="subscribe-caption">
+                    <h2>به خبرنامه ما بپیوندید</h2>
+                    <form action="#">
+                        <input type="text" placeholder="ایمیل خود را وارد کنید">
+                        <button class="btn">عضویت</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

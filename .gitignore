@@ -1,0 +1,16 @@
+storage/
+media/
+postgres_data/
+ftp_data/
+
+.idea/
+.vscode/
+
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+.ruff_cache

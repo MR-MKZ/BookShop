@@ -1,0 +1,222 @@
+<!doctype html>
+<html class="no-js" lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
+    <title>{% block title %}فروشگاه کتاب کابانا{% endblock %}</title>
+    <meta name="description" content="" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link
+      rel="shortcut icon"
+      type="image/x-icon"
+      href="{{ url_for('static', path='img/logo/favicon.png') }}"
+    />
+
+    <!-- CSS here -->
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', path='css/bootstrap.min.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', path='css/owl.carousel.min.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', path='css/slicknav.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', path='css/animate.min.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', path='css/price_rangs.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', path='css/magnific-popup.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', path='css/fontawesome-all.min.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', path='css/themify-icons.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', path='css/slick.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', path='css/nice-select.css') }}"
+    />
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', path='css/style.css') }}"
+    />
+
+    <!-- Custom CSS for RTL/Persian fixes if needed -->
+    <style>
+      body,
+      h1,
+      h2,
+      h3,
+      h4,
+      h5,
+      h6,
+      p,
+      a,
+      span {
+        font-family: "IRANSansWeb", sans-serif !important;
+      }
+      .header-area {
+        direction: ltr;
+      } /* Keep layout structure, change text direction inside */
+      .main-menu ul li {
+        float: right;
+      }
+      .slider-area,
+      .best-selling,
+      .latest-items {
+        direction: rtl;
+        text-align: right;
+      }
+    </style>
+  </head>
+
+  <body>
+    <header>
+      <div class="header-area">
+        <div class="main-header">
+          <div class="header-bottom header-sticky">
+            <div class="container-fluid">
+              <div class="row align-items-center">
+                <!-- Logo -->
+                <div class="col-xl-1 col-lg-1 col-md-1 col-sm-3">
+                  <div class="logo">
+                    <a href="/"
+                      ><img
+                        src="{{ url_for('static', path='img/logo/logo.png') }}"
+                        alt=""
+                    /></a>
+                  </div>
+                </div>
+                <div class="col-xl-6 col-lg-8 col-md-7 col-sm-5">
+                  <!-- Main-menu -->
+                  <div class="main-menu f-right d-none d-lg-block">
+                    <nav>
+                      <ul id="navigation">
+                        <li><a href="/">خانه</a></li>
+                        <li><a href="/search">کتاب‌ها</a></li>
+                        <li><a href="#">دسته‌بندی‌ها</a></li>
+                        <li><a href="#">وبلاگ</a></li>
+                        <li><a href="#">تماس با ما</a></li>
+                      </ul>
+                    </nav>
+                  </div>
+                </div>
+                <div class="col-xl-5 col-lg-3 col-md-3 col-sm-3 fix-card">
+                  <ul
+                    class="header-right f-right d-none d-lg-block d-flex justify-content-between"
+                  >
+                    <li class="d-none d-xl-block">
+                      <div class="form-box f-right">
+                        <form action="/search" method="get">
+                          <input
+                            type="text"
+                            name="q"
+                            placeholder="جستجو در کتاب‌ها..."
+                            value="{{ query if query else '' }}"
+                          />
+                          <div class="search-icon">
+                            <i class="fas fa-search special-tag"></i>
+                          </div>
+                        </form>
+                      </div>
+                    </li>
+                    <li class="d-none d-xl-block">
+                      <div class="favorit-items">
+                        <i class="far fa-heart"></i>
+                      </div>
+                    </li>
+                    <li>
+                      <div class="shopping-card">
+                        <a href="/cart"><i class="fas fa-shopping-cart"></i></a>
+                      </div>
+                    </li>
+                    <li class="d-none d-lg-block">
+                      <a href="/login" class="btn header-btn">ورود / ثبت نام</a>
+                    </li>
+                  </ul>
+                </div>
+                <!-- Mobile Menu -->
+                <div class="col-12">
+                  <div class="mobile_menu d-block d-lg-none"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main>{% block content %}{% endblock %}</main>
+
+    <footer>
+      <div class="footer-area footer-padding">
+        <div class="container">
+          <div class="row d-flex justify-content-between">
+            <div class="col-xl-3 col-lg-3 col-md-5 col-sm-6">
+              <div class="single-footer-caption mb-50">
+                <div class="single-footer-caption mb-30">
+                  <!-- logo -->
+                  <div class="footer-logo">
+                    <a href="/"
+                      ><img
+                        src="{{ url_for('static', path='img/logo/logo2_footer.png') }}"
+                        alt=""
+                    /></a>
+                  </div>
+                  <div class="footer-tittle">
+                    <div class="footer-pera">
+                      <p>
+                        کابانا، مرجع تخصصی دانلود و خرید کتاب‌های دیجیتال و
+                        چاپی.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <!-- Other footer columns... -->
+          </div>
+        </div>
+      </div>
+    </footer>
+
+    <!-- JS here -->
+    <script src="{{ url_for('static', path='js/modernizr-3.5.0.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/jquery-1.12.4.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/popper.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/bootstrap.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/jquery.slicknav.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/owl.carousel.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/slick.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/wow.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/jquery.magnific-popup.js') }}"></script>
+    <script src="{{ url_for('static', path='js/jquery.nice-select.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/jquery.counterup.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/waypoints.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/price_rangs.js') }}"></script>
+    <script src="{{ url_for('static', path='js/contact.js') }}"></script>
+    <script src="{{ url_for('static', path='js/jquery.form.js') }}"></script>
+    <script src="{{ url_for('static', path='js/jquery.validate.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/mail-script.js') }}"></script>
+    <script src="{{ url_for('static', path='js/jquery.ajaxchimp.min.js') }}"></script>
+    <script src="{{ url_for('static', path='js/plugins.js') }}"></script>
+    <script src="{{ url_for('static', path='js/main.js') }}"></script>
+  </body>
+</html>

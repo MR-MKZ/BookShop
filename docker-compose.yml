@@ -1,0 +1,139 @@
+services:
+  db:
+    profiles: ["dev", "prod", "scraper"]
+    image: postgres:15-alpine
+    container_name: kabana_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - .env
+    ports:
+      - "5432:5432" 
+    networks:
+      - kabana_net
+    restart: always
+
+  web:
+    profiles: ["dev"]
+    build: 
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: kabana_web_dev
+    volumes:
+      - .:/app
+      - ./storage:/app/storage
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    networks:
+      - kabana_net
+    depends_on:
+      - db
+      - ftp
+
+  pgadmin:
+    profiles: ["dev"]
+    image: dpage/pgadmin4
+    container_name: kabana_pgadmin
+    env_file:
+      - .env
+    ports:
+      - "5050:80"
+    networks:
+      - kabana_net
+    depends_on:
+      - db
+
+  ftp:
+    profiles: ["dev"]
+    image: fauria/vsftpd
+    container_name: kabana_ftp
+    env_file:
+      - .env
+    environment:
+      - PASV_MIN_PORT=21100
+      - PASV_MAX_PORT=21110
+      - LOCAL_UMASK=022 # این خط اضافه شد تا فایل‌های جدید توسط بقیه سرویس‌ها قابل خواندن باشند
+    volumes:
+      - ./storage:/home/vsftpd/ftp_user
+    ports:
+      - "20:20"
+      - "21:21"
+      - "21100-21110:21100-21110"
+    networks:
+      - kabana_net
+
+  # --- File Manager (Web Interface for files) ---
+  filemanager:
+    profiles: ["dev"]
+    image: filebrowser/filebrowser
+    container_name: kabana_filemanager
+    volumes:
+      - ./storage:/srv               # اتصال پوشه فایل‌ها
+      - filebrowser_data:/database   # دیتابیس داخلی فایل‌منیجر
+    environment:
+      - FB_DATABASE=/database/filebrowser.db
+      - FB_ROOT=/srv
+    ports:
+      - "8080:80" # دسترسی از طریق پورت 8080
+    networks:
+      - kabana_net
+
+  web_prod:
+    profiles: ["prod"]
+    build: 
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: kabana_web_prod
+    volumes:
+      - ./storage:/app/storage
+    env_file:
+      - .env
+    networks:
+      - kabana_net
+    depends_on:
+      - db
+    restart: always
+
+  nginx:
+    profiles: ["prod"]
+    image: nginx:alpine
+    container_name: kabana_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./storage:/usr/share/nginx/html/media:ro
+      - ./app/static:/usr/share/nginx/html/static:ro
+    networks:
+      - kabana_net
+    depends_on:
+      - web_prod
+    restart: always
+
+  scraper:
+    profiles: ["prod", "scraper"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kabana_scraper
+    command: python /app/app/scraper.py
+    volumes:
+      - .:/app
+      - ./storage:/app/storage
+    env_file:
+      - .env
+    networks:
+      - kabana_net
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
+  filebrowser_data: # والیوم جدید برای دیتابیس فایل منیجر
+
+networks:
+  kabana_net:
