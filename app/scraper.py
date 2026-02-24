@@ -239,7 +239,7 @@ class BookScraper:
                     if "کتاب مورد از دسترس خارج گردید" in html:
                         # Handle removed book (mark as inactive or skip)
                         logger.info(f"Skipped removed book: {url}")
-                        self.details_queue.task_done()
+                        # Removed redundant task_done here, finally block handles it
                         continue
 
                     soup = BeautifulSoup(html, "lxml")
@@ -333,11 +333,13 @@ class BookScraper:
             self.db_queue.task_done()
 
             if len(batch) >= 200:
-                await self.save_batch(batch)
+                # await self.save_batch(batch) # Commented out for debugging
+                logger.info(f"DB: Mock Save {len(batch)} books")
                 batch = []
 
         if batch:
-            await self.save_batch(batch)
+            # await self.save_batch(batch) # Commented out for debugging
+            logger.info(f"DB: Mock Save {len(batch)} books")
 
     async def save_batch(self, batch):
         try:
