@@ -7,6 +7,7 @@ import os
 import hashlib
 
 import aiohttp
+import aioftp
 import asyncpg
 from bs4 import BeautifulSoup
 
@@ -126,7 +127,7 @@ class BookScraper:
         return last_page
 
     async def fetch(self, session: aiohttp.ClientSession, url: str) -> str | None:
-        """High-speed fetcher."""
+        """High-speed fetcher (Text)."""
         async with self.semaphore:
             for attempt in range(self.args.retries):
                 try:
@@ -145,6 +146,76 @@ class BookScraper:
                     if attempt < self.args.retries - 1:
                         await asyncio.sleep(0.5)
             return None
+
+    async def fetch_bytes(self, session: aiohttp.ClientSession, url: str) -> bytes | None:
+        """High-speed fetcher (Bytes)."""
+        async with self.semaphore:
+            for attempt in range(self.args.retries):
+                try:
+                    async with session.get(
+                        url, headers=self.headers, timeout=self.args.timeout
+                    ) as response:
+                        if response.status == 200:
+                            return await response.read()
+                        elif response.status == 404:
+                            return None
+                        else:
+                            wait_time = 0.5 if self.args.turbo else (2**attempt)
+                            if attempt < self.args.retries - 1:
+                                await asyncio.sleep(wait_time)
+                except Exception:
+                    if attempt < self.args.retries - 1:
+                        await asyncio.sleep(0.5)
+            return None
+
+    async def upload_image_to_ftp(self, session, img_url, folder_name):
+        """Download image and stream directly to FTP"""
+        if not img_url:
+            return False
+
+        image_data = await self.fetch_bytes(session, img_url)
+        if not image_data:
+            return False
+
+        # Detect extension
+        ext = "jpg"
+        if img_url.lower().endswith(".png"):
+            ext = "png"
+        elif img_url.lower().endswith(".webp"):
+            ext = "webp"
+
+        filename = f"cover.{ext}"
+
+        ftp_client = None
+        try:
+            # Connect to FTP
+            client = aioftp.Client()
+            await client.connect(FTP_HOST, FTP_PORT)
+            await client.login(FTP_USER, FTP_PASS)
+            ftp_client = client
+
+            # Create directory if needed
+            try:
+                await ftp_client.make_directory(folder_name)
+            except aioftp.StatusCodeError:
+                pass  # Likely exists
+
+            # Change directory
+            await ftp_client.change_directory(folder_name)
+
+            # Upload
+            async with ftp_client.upload_stream(filename) as stream:
+                await stream.write(image_data)
+
+            logger.info(f"Uploaded cover for {folder_name}")
+            return True
+
+        except Exception as e:
+            logger.error(f"FTP Error for {folder_name}: {e}")
+            return False
+        finally:
+            if ftp_client:
+                await ftp_client.quit()
 
     async def check_exists(self, url: str) -> bool:
         """Fast existence check."""
@@ -284,6 +355,12 @@ class BookScraper:
                     title = info.get("عنوان فارسی", "Unknown")
                     # Make folder_name unique by appending md5 of url
                     folder_name = self.sanitize_filename(title) + "_" + hashlib.md5(url.encode()).hexdigest()[:6]
+
+                    # Upload Image to FTP
+                    if image_url:
+                        if not image_url.startswith("http"):
+                            image_url = self.base_url + image_url
+                        await self.upload_image_to_ftp(session, image_url, folder_name)
 
                     data = {
                         "url": url,
