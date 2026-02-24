@@ -8,6 +8,8 @@ class Settings(BaseSettings):
 
     # Security
     SECRET_KEY: str = "secret"
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     # File Storage
     MEDIA_ROOT: str = "/app/storage"
@@ -29,13 +31,16 @@ class Settings(BaseSettings):
     # Scraper
     SCRAPER_CONCURRENCY: int = 20
 
+    # Frontend
+    DOMAIN_NAME: str = "kabana.local"
+
     class Config:
         env_file = ".env"
         extra = "ignore"
 
     def get_public_link(self, remote_path: str) -> str:
         """
-        یک متد کمکی برای ساخت لینک دانلود بر اساس تنظیمات Env
+        Helper method to generate download links based on Env settings
         """
         auth_part = ""
         if self.LINK_BASE_USER and self.LINK_BASE_PASS:
@@ -45,7 +50,7 @@ class Settings(BaseSettings):
         if self.LINK_BASE_PORT != 21:
             port_part = f":{self.LINK_BASE_PORT}"
 
-        # حذف اسلش اضافی اول مسیر اگر وجود داشته باشد
+        # Remove leading slash if present
         clean_path = remote_path.lstrip("/")
 
         return f"{self.LINK_BASE_PROTOCOL}://{auth_part}{self.LINK_BASE_HOST}{port_part}/{clean_path}"

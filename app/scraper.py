@@ -55,22 +55,22 @@ class BookScraper:
             )
             # اطمینان از وجود جدول (اگر Alembic اجرا نشده باشد)
             # هرچند بهتر است این کار توسط Alembic انجام شود
-            async with self.db_pool.acquire() as conn:
-                await conn.execute("""
-                    CREATE TABLE IF NOT EXISTS books (
-                        id SERIAL PRIMARY KEY,
-                        title VARCHAR,
-                        author VARCHAR,
-                        publisher VARCHAR,
-                        isbn VARCHAR,
-                        description TEXT,
-                        price FLOAT,
-                        folder_name VARCHAR UNIQUE,
-                        file_format VARCHAR DEFAULT 'pdf',
-                        is_active BOOLEAN DEFAULT TRUE,
-                        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-                    );
-                """)
+            # async with self.db_pool.acquire() as conn:
+            #     await conn.execute("""
+            #         CREATE TABLE IF NOT EXISTS books (
+            #             id SERIAL PRIMARY KEY,
+            #             title VARCHAR,
+            #             author VARCHAR,
+            #             publisher VARCHAR,
+            #             isbn VARCHAR,
+            #             description TEXT,
+            #             price FLOAT,
+            #             folder_name VARCHAR UNIQUE,
+            #             file_format VARCHAR DEFAULT 'pdf',
+            #             is_active BOOLEAN DEFAULT TRUE,
+            #             created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            #         );
+            #     """)
         except Exception as e:
             logger.error(f"Failed to connect to Database: {e}")
             sys.exit(1)

@@ -26,13 +26,12 @@ class UserResponse(BaseModel):
 
 class BookResponse(BaseModel):
     id: int
-    title_fa: str | None
-    title_en: str | None
+    title: str | None
     author: str | None
     publisher: str | None
-    price: str | None
-    image_url: str | None
+    price: Decimal | None
     description: str | None
+    file_format: str | None
     is_active: bool
 
     class Config:
@@ -41,14 +40,7 @@ class BookResponse(BaseModel):
 
 class BookDetail(BookResponse):
     isbn: str | None
-    publish_year: str | None
-    language: str | None
-    pages: str | None
-    file_format: str | None
-    file_size: str | None
-    edition: str | None
-    availability: str | None
-    category: str | None
+    folder_name: str | None
 
 
 class OrderCreate(BaseModel):

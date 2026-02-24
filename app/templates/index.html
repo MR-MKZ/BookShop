@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}فروشگاه کتاب کابانا - خانه{% endblock %}
+
+{% block content %}
+<div class="slider-area home">
+    <div class="container">
+        <div class="row">
+            <div class="col-xl-12">
+                <div class="hero-caption text-center" style="padding: 100px 0;">
+                    <h1 data-animation="fadeInUp" data-delay=".4s">به کتابفروشی کابانا خوش آمدید</h1>
+                    <p data-animation="fadeInUp" data-delay=".6s">مرجع دانلود کتاب‌های دیجیتال</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="best-selling section-bg">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-xl-7 col-lg-8">
+                <div class="section-tittle text-center mb-55">
+                    <h2>تازه‌ترین کتاب‌ها</h2>
+                </div>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-xl-12">
+                <div class="selling-active">
+                    <!-- Loop through books passed from backend -->
+                    {% for book in books %}
+                    <div class="properties pb-20">
+                        <div class="properties-card">
+                            <div class="properties-img">
+                                <a href="/book/{{ book.id }}">
+                                    <!-- Use media proxy for cover -->
+                                    <img src="/media/proxy/cover/{{ book.folder_name }}/cover.jpg"
+                                         alt="{{ book.title }}"
+                                         onerror="this.src='{{ url_for('static', path='img/book/default.jpg') }}'"
+                                         style="height: 300px; object-fit: cover;">
+                                </a>
+                            </div>
+                            <div class="properties-caption">
+                                <h3><a href="/book/{{ book.id }}">{{ book.title }}</a></h3>
+                                <a href="#" class="author">{{ book.author }}</a>
+                                <div class="properties-footer">
+                                    <div class="price">
+                                        <p>{{ "{:,.0f}".format(book.price|float) if book.price else "رایگان" }} <span>تومان</span></p>
+                                    </div>
+                                    <a href="/book/{{ book.id }}" class="btn btn-sm btn-primary mt-2">جزئیات</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="col-12 text-center">
+                        <p>هیچ کتابی یافت نشد.</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

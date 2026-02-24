@@ -6,13 +6,13 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.database import Base, engine
-from app.routes import auth, books, cart, media_proxy, store
+from app.database import engine, Base
+from app.routers import auth, media, store, admin
 
-# Create database tables
-Base.metadata.create_all(bind=engine)
+# Create database tables (Sync for now, or rely on Alembic)
+# Base.metadata.create_all(bind=engine) # Better to use Alembic
 
-app = FastAPI(title="BookShop", description="Digital Book Store", version="1.0.0")
+app = FastAPI(title="Kabana Book Store", description="Digital Book Store", version="1.0.0")
 
 # CORS middleware
 app.add_middleware(
@@ -24,27 +24,24 @@ app.add_middleware(
 )
 
 # Mount static files
-static_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "app", "static")
+# Ensure static directory exists
+static_path = os.path.join(os.path.dirname(__file__), "static")
+if not os.path.exists(static_path):
+    os.makedirs(static_path)
+
 app.mount("/static", StaticFiles(directory=static_path), name="static")
 
 # Templates
-templates = Jinja2Templates(directory=os.path.join(static_path, "templates"))
+templates_path = os.path.join(os.path.dirname(__file__), "templates")
+if not os.path.exists(templates_path):
+    os.makedirs(templates_path)
+templates = Jinja2Templates(directory=templates_path)
 
 # Include routers
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
-app.include_router(books.router, tags=["books"])
-app.include_router(cart.router, prefix="/cart", tags=["cart"])
-app.include_router(store.router, prefix="/store", tags=["store"])
-app.include_router(media_proxy.router, prefix="/media", tags=["media"])
-# app.include_router(checkout.router, prefix="/checkout", tags=["checkout"])
-# app.include_router(admin.router, prefix="/admin", tags=["admin"])
-# app.include_router(downloads.router, prefix="/download", tags=["downloads"])
-
-
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    """Home page"""
-    return templates.TemplateResponse("index.html", {"request": request})
+app.include_router(store.router, tags=["store"]) # No prefix for store to handle root /
+app.include_router(media.router, tags=["media"])
+app.include_router(admin.router, tags=["admin"])
 
 
 @app.get("/health")

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}جستجو - {{ query }}{% endblock %}
+
+{% block content %}
+<div class="slider-area ">
+    <div class="single-slider slider-height2 d-flex align-items-center">
+        <div class="container">
+            <div class="row">
+                <div class="col-xl-12">
+                    <div class="hero-cap text-center">
+                        <h2>نتایج جستجو برای: {{ query }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="listing-area pt-50 pb-50">
+    <div class="container">
+        <div class="row">
+            <div class="col-xl-12">
+                <div class="row">
+                    {% for book in books %}
+                    <div class="col-xl-4 col-lg-4 col-md-6">
+                        <div class="properties pb-20">
+                            <div class="properties-card">
+                                <div class="properties-img">
+                                    <a href="/book/{{ book.id }}">
+                                        <img src="/media/proxy/cover/{{ book.folder_name }}/cover.jpg"
+                                             alt="{{ book.title }}"
+                                             onerror="this.src='{{ url_for('static', path='img/book/default.jpg') }}'"
+                                             style="height: 300px; object-fit: cover;">
+                                    </a>
+                                </div>
+                                <div class="properties-caption">
+                                    <h3><a href="/book/{{ book.id }}">{{ book.title }}</a></h3>
+                                    <p>{{ book.author }}</p>
+                                    <div class="properties-footer">
+                                        <div class="price">
+                                            <span>{{ "{:,.0f}".format(book.price|float) if book.price else "رایگان" }} تومان</span>
+                                        </div>
+                                    </div>
+                                    <a href="/book/{{ book.id }}" class="btn btn-sm btn-primary mt-2">مشاهده</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="col-12 text-center">
+                        <h3>هیچ نتیجه‌ای یافت نشد.</h3>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

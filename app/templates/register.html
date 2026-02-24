@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block title %}ثبت نام در کابانا{% endblock %}
+
+{% block content %}
+<div class="login-bg" style="padding: 100px 0;">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-xl-6 col-lg-7 col-md-10">
+                <div class="login-form-area">
+                    <form class="login-form" action="/auth/register" method="post">
+                        <div class="login-heading">
+                            <span>ثبت نام</span>
+                            <p>عضویت در خانواده کابانا</p>
+                        </div>
+
+                        {% if error %}
+                        <div class="alert alert-danger">{{ error }}</div>
+                        {% endif %}
+
+                        <div class="input-box">
+                            <div class="single-input-fields">
+                                <label>نام و نام خانوادگی</label>
+                                <input type="text" name="full_name" placeholder="نام کامل" required>
+                            </div>
+                            <div class="single-input-fields">
+                                <label>نام کاربری</label>
+                                <input type="text" name="username" placeholder="نام کاربری" required>
+                            </div>
+                            <div class="single-input-fields">
+                                <label>ایمیل</label>
+                                <input type="email" name="email" placeholder="ایمیل" required>
+                            </div>
+                            <div class="single-input-fields">
+                                <label>رمز عبور</label>
+                                <input type="password" name="password" placeholder="رمز عبور" required>
+                            </div>
+                        </div>
+
+                        <div class="login-footer">
+                            <p>قبلا ثبت نام کرده اید؟ <a href="/auth/login">وارد شوید</a>.</p>
+                            <button class="submit-btn3">ثبت نام</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
