@@ -16,22 +16,27 @@ branch_labels = None
 depends_on = None
 
 def upgrade() -> None:
-    # Use raw SQL to create types safely
-    # This avoids sqlalchemy trying to create them again when they are used in columns
-    conn = op.get_bind()
+    # Use DO block to safely create types if they don't exist
+    # This prevents transaction abortion because the error is caught inside PL/pgSQL
+    op.execute(sa.text("""
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'userrole') THEN
+            CREATE TYPE userrole AS ENUM ('ADMIN', 'USER');
+        END IF;
+    END
+    $$;
+    """))
 
-    # UserRole Enum
-    try:
-        conn.execute(sa.text("CREATE TYPE userrole AS ENUM ('ADMIN', 'USER')"))
-    except Exception:
-        # Ignore if exists (Checking via exception is safer across different PG versions/drivers than querying pg_type manually here)
-        pass
-
-    # OrderStatus Enum
-    try:
-        conn.execute(sa.text("CREATE TYPE orderstatus AS ENUM ('PENDING', 'PAID', 'FAILED', 'CANCELLED')"))
-    except Exception:
-        pass
+    op.execute(sa.text("""
+    DO $$
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'orderstatus') THEN
+            CREATE TYPE orderstatus AS ENUM ('PENDING', 'PAID', 'FAILED', 'CANCELLED');
+        END IF;
+    END
+    $$;
+    """))
 
     # Users
     op.create_table('users',
@@ -42,7 +47,7 @@ def upgrade() -> None:
         sa.Column('full_name', sa.String(), nullable=True),
         sa.Column('phone', sa.String(), nullable=True),
         sa.Column('is_active', sa.Boolean(), nullable=True),
-        # Use postgresql.ENUM with create_type=False since we handled creation above
+        # Use postgresql.ENUM with create_type=False since we handled creation safely above
         sa.Column('role', postgresql.ENUM('ADMIN', 'USER', name='userrole', create_type=False), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=True),
         sa.PrimaryKeyConstraint('id')
