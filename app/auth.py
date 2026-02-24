@@ -18,12 +18,25 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against a hash"""
+    """
+    Verify a password against a hash.
+    Truncate to 72 bytes to avoid bcrypt limitation errors.
+    """
+    # BCrypt has a 72 byte limit on input. Passlib might not handle this automatically in all versions.
+    if plain_password and len(plain_password.encode('utf-8')) > 72:
+        plain_password = plain_password[:72]
+
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def get_password_hash(password: str) -> str:
-    """Hash a password"""
+    """
+    Hash a password.
+    Truncate to 72 bytes to avoid bcrypt limitation errors.
+    """
+    if password and len(password.encode('utf-8')) > 72:
+        password = password[:72]
+
     return pwd_context.hash(password)
 
 
