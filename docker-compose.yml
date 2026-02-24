@@ -102,7 +102,7 @@ services:
     depends_on:
       - db
     restart: always
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    # CMD is defined in Dockerfile.prod, no need to override here unless necessary
 
   # Nginx Reverse Proxy (Production)
   nginx:
