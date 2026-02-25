@@ -139,8 +139,6 @@ services:
       - .env
     networks:
       - kabana_net
-    depends_on:
-      - db
 
 volumes:
   postgres_data:
