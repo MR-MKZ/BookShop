@@ -1,13 +1,14 @@
 import argparse
 import asyncio
+import hashlib
 import logging
+import os
+import random
 import re
 import sys
-import os
-import hashlib
 
-import aiohttp
 import aioftp
+import aiohttp
 import asyncpg
 from bs4 import BeautifulSoup
 
@@ -83,11 +84,14 @@ class BookScraper:
                         file_size VARCHAR,
                         edition VARCHAR,
                         price NUMERIC,
+                        original_price NUMERIC,
                         availability VARCHAR,
                         amazon_link VARCHAR,
                         image_url VARCHAR,
                         description TEXT,
                         folder_name VARCHAR UNIQUE,
+                        cover_filename VARCHAR DEFAULT 'cover.jpg',
+                        has_pdf BOOLEAN DEFAULT FALSE,
                         is_active BOOLEAN DEFAULT TRUE,
                         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                         updated_at TIMESTAMP WITH TIME ZONE
@@ -169,13 +173,13 @@ class BookScraper:
             return None
 
     async def upload_image_to_ftp(self, session, img_url, folder_name):
-        """Download image and stream directly to FTP"""
+        """Download image and stream directly to FTP. Returns cover filename or None."""
         if not img_url:
-            return False
+            return None
 
         image_data = await self.fetch_bytes(session, img_url)
         if not image_data:
-            return False
+            return None
 
         # Detect extension
         ext = "jpg"
@@ -188,31 +192,27 @@ class BookScraper:
 
         ftp_client = None
         try:
-            # Connect to FTP
             client = aioftp.Client()
             await client.connect(FTP_HOST, FTP_PORT)
             await client.login(FTP_USER, FTP_PASS)
             ftp_client = client
 
-            # Create directory if needed
             try:
                 await ftp_client.make_directory(folder_name)
             except aioftp.StatusCodeError:
-                pass  # Likely exists
+                pass
 
-            # Change directory
             await ftp_client.change_directory(folder_name)
 
-            # Upload
             async with ftp_client.upload_stream(filename) as stream:
                 await stream.write(image_data)
 
             logger.info(f"Uploaded cover for {folder_name}")
-            return True
+            return filename
 
         except Exception as e:
             logger.error(f"FTP Error for {folder_name}: {e}")
-            return False
+            return None
         finally:
             if ftp_client:
                 await ftp_client.quit()
@@ -338,9 +338,13 @@ class BookScraper:
 
                     price_str = get_meta("productprice")
                     try:
-                        price = float(re.sub(r'[^\d.]', '', price_str))
-                    except:
-                        price = 0.0
+                        raw_price = float(re.sub(r"[^\d.]", "", price_str))
+                    except Exception:
+                        raw_price = 0.0
+
+                    # Sale price 2–3k below source; strikethrough original 30–40k above sale
+                    sale_price = max(0.0, raw_price - random.randint(2000, 3000))
+                    original_price = sale_price + random.randint(30000, 40000)
 
                     availability = get_meta("availability")
 
@@ -353,14 +357,21 @@ class BookScraper:
                     description = desc_tag.text.strip() if desc_tag else ""
 
                     title = info.get("عنوان فارسی", "Unknown")
-                    # Make folder_name unique by appending md5 of url
-                    folder_name = self.sanitize_filename(title) + "_" + hashlib.md5(url.encode()).hexdigest()[:6]
+                    folder_name = (
+                        self.sanitize_filename(title)
+                        + "_"
+                        + hashlib.md5(url.encode()).hexdigest()[:6]
+                    )
 
-                    # Upload Image to FTP
+                    cover_filename = "cover.jpg"
                     if image_url:
                         if not image_url.startswith("http"):
                             image_url = self.base_url + image_url
-                        await self.upload_image_to_ftp(session, image_url, folder_name)
+                        uploaded = await self.upload_image_to_ftp(
+                            session, image_url, folder_name
+                        )
+                        if uploaded:
+                            cover_filename = uploaded
 
                     data = {
                         "url": url,
@@ -375,12 +386,14 @@ class BookScraper:
                         "format": info.get("فرمت کتاب", ""),
                         "size": info.get("حجم فایل", ""),
                         "edition": info.get("ویرایش", ""),
-                        "price": price,
+                        "price": sale_price,
+                        "original_price": original_price,
                         "availability": availability,
                         "amazon_link": amazon_link,
                         "image_url": image_url,
                         "description": description,
-                        "folder_name": folder_name
+                        "folder_name": folder_name,
+                        "cover_filename": cover_filename,
                     }
 
                     await self.db_queue.put(data)
@@ -424,16 +437,37 @@ class BookScraper:
                     INSERT INTO books
                     (url, title, title_en, author, publisher, isbn,
                     publish_year, language, pages, file_format, file_size,
-                    edition, price, availability, amazon_link, image_url, description, folder_name)
+                    edition, price, original_price, availability, amazon_link,
+                    image_url, description, folder_name, cover_filename, has_pdf)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11,
-                    $12, $13, $14, $15, $16, $17, $18)
+                    $12, $13, $14, $15, $16, $17, $18, $19, $20, FALSE)
                     ON CONFLICT (url) DO NOTHING
                     """,
-                    [(
-                        d['url'], d['title_fa'], d['title_en'], d['author'], d['publisher'], d['isbn'],
-                        d['year'], d['language'], d['pages'], d['format'], d['size'],
-                        d['edition'], d['price'], d['availability'], d['amazon_link'], d['image_url'], d['description'], d['folder_name']
-                    ) for d in batch]
+                    [
+                        (
+                            d["url"],
+                            d["title_fa"],
+                            d["title_en"],
+                            d["author"],
+                            d["publisher"],
+                            d["isbn"],
+                            d["year"],
+                            d["language"],
+                            d["pages"],
+                            d["format"],
+                            d["size"],
+                            d["edition"],
+                            d["price"],
+                            d["original_price"],
+                            d["availability"],
+                            d["amazon_link"],
+                            d["image_url"],
+                            d["description"],
+                            d["folder_name"],
+                            d.get("cover_filename", "cover.jpg"),
+                        )
+                        for d in batch
+                    ],
                 )
                 logger.info(f"DB: Saved {len(batch)} books")
         except Exception as e:

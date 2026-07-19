@@ -1,0 +1,41 @@
+{% extends "admin/base.html" %}
+{% block title %}کاربران{% endblock %}
+{% block content %}
+<h1>کاربران</h1>
+<form class="filters" method="get">
+    <input type="text" name="q" value="{{ q }}" placeholder="نام یا موبایل">
+    <button class="btn" type="submit">جستجو</button>
+</form>
+<p>{{ total }} کاربر</p>
+<table>
+    <thead>
+        <tr><th>شناسه</th><th>نام</th><th>موبایل</th><th>نقش</th><th>وضعیت</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for u in users %}
+        <tr>
+            <td>{{ u.id }}</td>
+            <td>{{ u.display_name }}</td>
+            <td dir="ltr">{{ u.phone }}</td>
+            <td>{{ u.role.value }}</td>
+            <td>{% if u.is_active %}<span class="badge badge-ok">فعال</span>{% else %}<span class="badge badge-no">غیرفعال</span>{% endif %}</td>
+            <td>
+                <form class="inline" method="post" action="/admin/users/{{ u.id }}/toggle">
+                    <button class="btn btn-sm {% if u.is_active %}btn-danger{% else %}btn{% endif %}" type="submit">
+                        {% if u.is_active %}غیرفعال{% else %}فعال{% endif %}
+                    </button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">موردی نیست</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% if total_pages and total_pages > 1 %}
+<div class="pager">
+    {% if page > 1 %}<a class="btn btn-secondary" href="/admin/users?q={{ q|urlencode }}&page={{ page-1 }}">قبلی</a>{% endif %}
+    {% if page < total_pages %}<a class="btn btn-secondary" href="/admin/users?q={{ q|urlencode }}&page={{ page+1 }}">بعدی</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

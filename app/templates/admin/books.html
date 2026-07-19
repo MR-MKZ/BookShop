@@ -1,0 +1,56 @@
+{% extends "admin/base.html" %}
+{% block title %}کتاب‌ها{% endblock %}
+{% block content %}
+<h1>مدیریت کتاب‌ها</h1>
+{% if message %}<div class="msg">عملیات با موفقیت انجام شد ({{ message }})</div>{% endif %}
+<form class="filters" method="get" action="/admin/books">
+    <input type="text" name="q" value="{{ q }}" placeholder="جستجو عنوان / نویسنده / ISBN">
+    <label><input type="checkbox" name="missing_pdf" value="1" {% if missing_pdf %}checked{% endif %}> فقط بدون PDF</label>
+    <button class="btn" type="submit">فیلتر</button>
+</form>
+<p>{{ total }} کتاب — صفحه {{ page }}{% if total_pages %} از {{ total_pages }}{% endif %}</p>
+<table>
+    <thead>
+        <tr>
+            <th>شناسه</th>
+            <th>عنوان</th>
+            <th>نویسنده</th>
+            <th>قیمت</th>
+            <th>PDF</th>
+            <th>وضعیت</th>
+            <th>عملیات</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for book in books %}
+        <tr>
+            <td>{{ book.id }}</td>
+            <td>{{ book.title }}</td>
+            <td>{{ book.author or '—' }}</td>
+            <td dir="ltr">{{ "{:,.0f}".format(book.price|float) if book.price else 0 }}</td>
+            <td>
+                {% if book.has_pdf %}
+                    <span class="badge badge-ok">دارد</span>
+                {% else %}
+                    <span class="badge badge-no">ندارد</span>
+                    <form class="inline" action="/admin/books/{{ book.id }}/upload" method="post" enctype="multipart/form-data">
+                        <input type="file" name="file" accept=".pdf,application/pdf" required>
+                        <button class="btn btn-sm" type="submit">آپلود</button>
+                    </form>
+                {% endif %}
+            </td>
+            <td>{% if book.is_active %}فعال{% else %}غیرفعال{% endif %}</td>
+            <td><a class="btn btn-sm btn-secondary" href="/admin/books/{{ book.id }}">ویرایش</a></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">موردی یافت نشد</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% if total_pages and total_pages > 1 %}
+<div class="pager">
+    {% if page > 1 %}<a class="btn btn-secondary" href="/admin/books?q={{ q|urlencode }}&missing_pdf={{ missing_pdf }}&page={{ page-1 }}">قبلی</a>{% endif %}
+    {% if page < total_pages %}<a class="btn btn-secondary" href="/admin/books?q={{ q|urlencode }}&missing_pdf={{ missing_pdf }}&page={{ page+1 }}">بعدی</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

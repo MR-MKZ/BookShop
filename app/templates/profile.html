@@ -1,40 +1,77 @@
 {% extends "base.html" %}
+{% from "macros.html" import dual_price %}
 
-{% block title %}پروفایل کاربری{% endblock %}
+{% block title %}پروفایل — کابانا{% endblock %}
 
 {% block content %}
-<div class="slider-area ">
-    <div class="single-slider slider-height2 d-flex align-items-center">
-        <div class="container">
-            <div class="row">
-                <div class="col-xl-12">
-                    <div class="hero-cap text-center">
-                        <h2>پروفایل کاربری</h2>
-                    </div>
-                </div>
-            </div>
-        </div>
+<div class="breadcrumb-items">
+    <div class="row">
+        <ul class="breadcrumb">
+            <li><a href="/" class="breadcrumb-link">صفحه اصلی</a></li>
+            <li class="chevron"><span class="fa fa-chevron-left"></span></li>
+            <li><span class="breadcrumb-active">کتابخانه من</span></li>
+        </ul>
     </div>
 </div>
 
-<div class="section-padding">
+<div class="listing-area section-padding">
     <div class="container">
+        {% if pay == 'ok' %}
+            <div class="alert alert-success">پرداخت موفق بود. کتاب به کتابخانه شما اضافه شد.</div>
+        {% elif pay == 'failed' %}
+            <div class="alert alert-danger">پرداخت ناموفق بود.</div>
+        {% elif pay == 'error' %}
+            <div class="alert alert-warning">خطا در پردازش پرداخت.</div>
+        {% endif %}
+
+        <div class="row mb-40">
+            <div class="col-xl-12">
+                <div class="section-tittle mb-20">
+                    <h2>سلام {{ current_user.display_name }}</h2>
+                </div>
+                <p>شماره موبایل: <span dir="ltr">{{ current_user.phone }}</span></p>
+            </div>
+        </div>
+
         <div class="row">
-            <div class="col-lg-8 offset-lg-2">
-                <div class="card">
-                    <div class="card-header">
-                        اطلاعات حساب
-                    </div>
-                    <div class="card-body">
-                        <h5 class="card-title">{{ current_user.full_name }}</h5>
-                        <p class="card-text"><strong>نام کاربری:</strong> {{ current_user.username }}</p>
-                        <p class="card-text"><strong>ایمیل:</strong> {{ current_user.email }}</p>
-                        <p class="card-text"><strong>تلفن:</strong> {{ current_user.phone or 'ثبت نشده' }}</p>
-                        <p class="card-text"><strong>نقش:</strong> {{ current_user.role }}</p>
-                        <a href="/auth/logout" class="btn btn-danger">خروج</a>
+            <div class="col-xl-12">
+                <div class="section-tittle mb-30"><h2>کتاب‌های خریداری‌شده</h2></div>
+            </div>
+        </div>
+
+        <div class="row">
+            {% for item in library %}
+            <div class="col-xl-3 col-lg-4 col-md-6">
+                <div class="properties pb-20">
+                    <div class="properties-card">
+                        <div class="properties-img">
+                            <a href="/book/{{ item.book.id }}">
+                                <img src="/media/proxy/cover/{{ item.book.folder_name }}/{{ item.book.cover_filename or 'cover.jpg' }}"
+                                     alt="{{ item.book.title }}"
+                                     onerror="this.src='{{ url_for('static', path='img/gallery/best_selling1.jpg') }}'">
+                            </a>
+                        </div>
+                        <div class="properties-caption">
+                            <h3><a href="/book/{{ item.book.id }}">{{ item.book.title }}</a></h3>
+                            <p>{{ item.book.author or '' }}</p>
+                            <div class="properties-footer">
+                                {% if item.token %}
+                                    <a href="/media/proxy/book/{{ item.book.folder_name }}/{{ item.book.pdf_filename }}?token={{ item.token }}"
+                                       class="white-btn">دانلود مجدد</a>
+                                {% else %}
+                                    <span class="border-btn">فایل به‌زودی</span>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
+            {% else %}
+            <div class="col-12 text-center py-5">
+                <p>هنوز کتابی خریداری نکرده‌اید.</p>
+                <a href="/search?q= " class="btn">جستجوی کتاب</a>
+            </div>
+            {% endfor %}
         </div>
     </div>
 </div>

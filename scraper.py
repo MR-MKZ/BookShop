@@ -8,6 +8,9 @@ import aiohttp
 import aiosqlite
 from bs4 import BeautifulSoup
 
+# LEGACY: SQLite scraper kept for reference only.
+# Production scraper lives at app/scraper.py (PostgreSQL + FTP).
+
 # --- DEFAULTS ---
 DEFAULT_BASE_URL = "https://asbook.ir"
 DEFAULT_DB_NAME = "books_data.db"

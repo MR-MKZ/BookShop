@@ -1,47 +1,60 @@
-{% extends "base.html" %}
-
-{% block title %}ورود به حساب کاربری{% endblock %}
-
-{% block content %}
-<div class="login-bg" style="padding: 100px 0;">
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-xl-6 col-lg-7 col-md-10">
-                <div class="login-form-area">
-                    <form class="login-form" action="/auth/login" method="post">
-                        <div class="login-heading">
-                            <span>ورود</span>
-                            <p>برای دسترسی به سایت وارد شوید</p>
-                        </div>
-
-                        {% if error %}
-                        <div class="alert alert-danger">{{ error }}</div>
-                        {% endif %}
-
-                        <div class="input-box">
-                            <div class="single-input-fields">
-                                <label>نام کاربری</label>
-                                <input type="text" name="username" placeholder="نام کاربری" required>
-                            </div>
-                            <div class="single-input-fields">
-                                <label>رمز عبور</label>
-                                <input type="password" name="password" placeholder="رمز عبور" required>
-                            </div>
-                            <div class="single-input-fields login-check">
-                                <input type="checkbox" id="fruit1" name="keep-log">
-                                <label for="fruit1">مرا به یاد داشته باش!</label>
-                                <a href="#" class="f-right">رمز خود را فراموش کرده اید؟</a>
-                            </div>
-                        </div>
-
-                        <div class="login-footer">
-                            <p>حساب کاربری ندارید؟ <a href="/auth/register">ثبت نام</a> کنید.</p>
-                            <button class="submit-btn3">ورود</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
+<!doctype html>
+<html class="no-js" lang="fa" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <title>ورود — کابانا</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="shortcut icon" type="image/x-icon" href="{{ url_for('static', path='img/logo/favicon.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/fontawesome-all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/themify-icons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+</head>
+<body>
+<main class="login-bg">
+    <div class="breadcrumb-items">
+        <div class="row">
+            <ul class="breadcrumb">
+                <li><a href="/" class="breadcrumb-link">صفحه اصلی</a></li>
+                <li class="chevron"><span class="fa fa-chevron-left"></span></li>
+                <li><span class="breadcrumb-active">ورود</span></li>
+            </ul>
         </div>
     </div>
-</div>
-{% endblock %}
+
+    <div class="login-form-area">
+        <div class="login-form">
+            <div class="login-heading">
+                <span>ورود</span>
+                <p>با شماره موبایل وارد شوید</p>
+            </div>
+
+            {% if error %}
+            <div class="alert alert-danger" style="margin-bottom: 15px;">{{ error }}</div>
+            {% endif %}
+
+            <form method="post" action="/auth/login">
+                <input type="hidden" name="next" value="{{ next|default(request.query_params.get('next', '/')) }}">
+                <div class="input-box">
+                    <div class="single-input-fields">
+                        <label>شماره موبایل</label>
+                        <input type="tel" name="phone" placeholder="09153276607" value="{{ phone|default('') }}" required pattern="09[0-9]{9}" dir="ltr">
+                    </div>
+                    <div class="single-input-fields">
+                        <label>رمز عبور</label>
+                        <input type="password" name="password" placeholder="رمز عبور" required>
+                    </div>
+                </div>
+                <div class="login-footer">
+                    <p>حساب کاربری ندارید؟ <a href="/auth/register">ثبت نام</a> کنید.</p>
+                    <button type="submit" class="submit-btn3">ورود</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+<script src="{{ url_for('static', path='js/jquery-1.12.4.min.js') }}"></script>
+<script src="{{ url_for('static', path='js/bootstrap.min.js') }}"></script>
+</body>
+</html>

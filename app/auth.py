@@ -8,16 +8,16 @@ from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.security.utils import get_authorization_scheme_param
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_async_db
 from app.models import User, UserRole
+from app.utils.phone import normalize_iran_phone
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
+
 
 def get_password_hash(password: str) -> str:
     """
@@ -26,17 +26,17 @@ def get_password_hash(password: str) -> str:
     """
     if not password:
         raise ValueError("Password cannot be empty")
-        
-    b64_hash = base64.b64encode(hashlib.sha256(password.encode('utf-8')).digest())
-    
+
+    b64_hash = base64.b64encode(hashlib.sha256(password.encode("utf-8")).digest())
     salt = bcrypt.gensalt()
     hashed_bytes = bcrypt.hashpw(b64_hash, salt)
-    
-    return hashed_bytes.decode('utf-8')
+    return hashed_bytes.decode("utf-8")
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    b64_hash = base64.b64encode(hashlib.sha256(plain_password.encode('utf-8')).digest())
-    return bcrypt.checkpw(b64_hash, hashed_password.encode('utf-8'))
+    b64_hash = base64.b64encode(hashlib.sha256(plain_password.encode("utf-8")).digest())
+    return bcrypt.checkpw(b64_hash, hashed_password.encode("utf-8"))
+
 
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
     """Create JWT access token"""
@@ -48,17 +48,13 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
             minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
         )
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(
-        to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM
-    )
-    return encoded_jwt
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
-async def authenticate_user(db: AsyncSession, username: str, password: str) -> User | None:
-    """Authenticate a user"""
-    result = await db.execute(
-        select(User).where((User.username == username) | (User.email == username))
-    )
+async def authenticate_user(db: AsyncSession, phone: str, password: str) -> User | None:
+    """Authenticate a user by Iranian phone number."""
+    phone = normalize_iran_phone(phone)
+    result = await db.execute(select(User).where(User.phone == phone))
     user = result.scalar_one_or_none()
 
     if not user:
@@ -71,7 +67,7 @@ async def authenticate_user(db: AsyncSession, username: str, password: str) -> U
 async def get_current_user(
     request: Request,
     token: Optional[str] = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_async_db)
+    db: AsyncSession = Depends(get_async_db),
 ) -> User:
     """Get current authenticated user from Header or Cookie"""
     credentials_exception = HTTPException(
@@ -80,7 +76,6 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # Try to get token from cookie if not in header
     if not token:
         cookie_authorization: str = request.cookies.get("access_token")
         if cookie_authorization:
@@ -88,7 +83,7 @@ async def get_current_user(
             if scheme.lower() == "bearer":
                 token = param
             else:
-                 token = cookie_authorization # Fallback if just token string
+                token = cookie_authorization
 
     if not token:
         raise credentials_exception
@@ -97,18 +92,32 @@ async def get_current_user(
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
         )
-        username: str = payload.get("sub")
-        if username is None:
+        subject: str = payload.get("sub")
+        if subject is None:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
 
-    result = await db.execute(select(User).where(User.username == username))
+    # Prefer phone (new tokens); fall back to username for old tokens
+    result = await db.execute(
+        select(User).where((User.phone == subject) | (User.username == subject))
+    )
     user = result.scalar_one_or_none()
 
     if user is None:
         raise credentials_exception
     return user
+
+
+async def get_current_user_optional(
+    request: Request,
+    token: Optional[str] = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_async_db),
+) -> User | None:
+    try:
+        return await get_current_user(request=request, token=token, db=db)
+    except HTTPException:
+        return None
 
 
 async def get_current_admin_user(

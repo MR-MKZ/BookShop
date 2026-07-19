@@ -1,50 +1,67 @@
-{% extends "base.html" %}
-
-{% block title %}ثبت نام در کابانا{% endblock %}
-
-{% block content %}
-<div class="login-bg" style="padding: 100px 0;">
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-xl-6 col-lg-7 col-md-10">
-                <div class="login-form-area">
-                    <form class="login-form" action="/auth/register" method="post">
-                        <div class="login-heading">
-                            <span>ثبت نام</span>
-                            <p>عضویت در خانواده کابانا</p>
-                        </div>
-
-                        {% if error %}
-                        <div class="alert alert-danger">{{ error }}</div>
-                        {% endif %}
-
-                        <div class="input-box">
-                            <div class="single-input-fields">
-                                <label>نام و نام خانوادگی</label>
-                                <input type="text" name="full_name" placeholder="نام کامل" required>
-                            </div>
-                            <div class="single-input-fields">
-                                <label>نام کاربری</label>
-                                <input type="text" name="username" placeholder="نام کاربری" required>
-                            </div>
-                            <div class="single-input-fields">
-                                <label>ایمیل</label>
-                                <input type="email" name="email" placeholder="ایمیل" required>
-                            </div>
-                            <div class="single-input-fields">
-                                <label>رمز عبور</label>
-                                <input type="password" name="password" placeholder="رمز عبور" required>
-                            </div>
-                        </div>
-
-                        <div class="login-footer">
-                            <p>قبلا ثبت نام کرده اید؟ <a href="/auth/login">وارد شوید</a>.</p>
-                            <button class="submit-btn3">ثبت نام</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
+<!doctype html>
+<html class="no-js" lang="fa" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <title>ثبت‌نام — کابانا</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="shortcut icon" type="image/x-icon" href="{{ url_for('static', path='img/logo/favicon.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/fontawesome-all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/themify-icons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
+</head>
+<body>
+<main class="register-bg">
+    <div class="breadcrumb-items">
+        <div class="row">
+            <ul class="breadcrumb">
+                <li><a href="/" class="breadcrumb-link">صفحه اصلی</a></li>
+                <li class="chevron"><span class="fa fa-chevron-left"></span></li>
+                <li><span class="breadcrumb-active">ثبت‌نام</span></li>
+            </ul>
         </div>
     </div>
-</div>
-{% endblock %}
+
+    <div class="register-form-area">
+        <div class="register-form">
+            <div class="register-heading">
+                <span>ثبت‌نام</span>
+                <p>حساب کاربری جدید بسازید</p>
+            </div>
+
+            {% if error %}
+            <div class="alert alert-danger" style="margin-bottom: 15px;">{{ error }}</div>
+            {% endif %}
+
+            <form method="post" action="/auth/register">
+                <div class="input-box">
+                    <div class="single-input-fields">
+                        <label>نام</label>
+                        <input type="text" name="first_name" placeholder="نام" value="{{ form.first_name|default('') }}" required minlength="2">
+                    </div>
+                    <div class="single-input-fields">
+                        <label>نام خانوادگی</label>
+                        <input type="text" name="last_name" placeholder="نام خانوادگی" value="{{ form.last_name|default('') }}" required minlength="2">
+                    </div>
+                    <div class="single-input-fields">
+                        <label>شماره موبایل</label>
+                        <input type="tel" name="phone" placeholder="09016513748" value="{{ form.phone|default('') }}" required pattern="09[0-9]{9}" dir="ltr">
+                    </div>
+                    <div class="single-input-fields">
+                        <label>رمز عبور</label>
+                        <input type="password" name="password" placeholder="حداقل ۶ کاراکتر" required minlength="6">
+                    </div>
+                </div>
+                <div class="register-footer">
+                    <p>قبلاً ثبت‌نام کرده‌اید؟ <a href="/auth/login">ورود</a></p>
+                    <button type="submit" class="submit-btn3">ثبت‌نام</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</main>
+<script src="{{ url_for('static', path='js/jquery-1.12.4.min.js') }}"></script>
+<script src="{{ url_for('static', path='js/bootstrap.min.js') }}"></script>
+</body>
+</html>

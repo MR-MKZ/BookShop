@@ -1,0 +1,48 @@
+{% extends "admin/base.html" %}
+{% block title %}گزارش‌ها{% endblock %}
+{% block content %}
+<h1>گزارش فروش</h1>
+<form class="filters" method="get">
+    <label>از <input type="date" name="date_from" value="{{ date_from }}"></label>
+    <label>تا <input type="date" name="date_to" value="{{ date_to }}"></label>
+    <button class="btn" type="submit">اعمال بازه</button>
+</form>
+
+<div class="cards">
+    <div class="card"><div class="num">{{ "{:,.0f}".format(total_sales|float) }}</div><div class="label">مجموع فروش (تومان)</div></div>
+    <div class="card"><div class="num">{{ order_count }}</div><div class="label">تعداد سفارش موفق</div></div>
+</div>
+
+<h2>خلاصه ماهانه</h2>
+<table>
+    <thead><tr><th>ماه</th><th>تعداد سفارش</th><th>مبلغ</th></tr></thead>
+    <tbody>
+        {% for row in monthly_rows %}
+        <tr>
+            <td>{{ row[0] }}</td>
+            <td>{{ row[1] }}</td>
+            <td dir="ltr">{{ "{:,.0f}".format(row[2]|float) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3">داده‌ای در این بازه نیست</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<h2 style="margin-top:32px;">فروش هر کتاب</h2>
+<table>
+    <thead><tr><th>شناسه</th><th>عنوان</th><th>تعداد فروش</th><th>درآمد</th></tr></thead>
+    <tbody>
+        {% for row in book_rows %}
+        <tr>
+            <td>{{ row[0] }}</td>
+            <td>{{ row[1] }}</td>
+            <td>{{ row[2] }}</td>
+            <td dir="ltr">{{ "{:,.0f}".format(row[3]|float) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">فروشی ثبت نشده</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

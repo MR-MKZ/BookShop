@@ -1,15 +1,19 @@
 {% extends "base.html" %}
+{% from "macros.html" import book_card %}
 
-{% block title %}جستجو - {{ query }}{% endblock %}
+{% block title %}جستجو{% if query %}: {{ query }}{% endif %} — کابانا{% endblock %}
 
 {% block content %}
-<div class="slider-area ">
-    <div class="single-slider slider-height2 d-flex align-items-center">
+<div class="slider-area">
+    <div class="single-slider slider-height2 slider-bg2 d-flex align-items-center">
         <div class="container">
             <div class="row">
                 <div class="col-xl-12">
-                    <div class="hero-cap text-center">
-                        <h2>نتایج جستجو برای: {{ query }}</h2>
+                    <div class="hero-caption hero-caption2">
+                        <h2>نتایج جستجو</h2>
+                        {% if query %}
+                            <p>{{ total }} نتیجه برای «{{ query }}»</p>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -17,44 +21,41 @@
     </div>
 </div>
 
-<div class="listing-area pt-50 pb-50">
+<div class="listing-area section-padding">
     <div class="container">
         <div class="row">
-            <div class="col-xl-12">
-                <div class="row">
-                    {% for book in books %}
-                    <div class="col-xl-4 col-lg-4 col-md-6">
-                        <div class="properties pb-20">
-                            <div class="properties-card">
-                                <div class="properties-img">
-                                    <a href="/book/{{ book.id }}">
-                                        <img src="/media/proxy/cover/{{ book.folder_name }}/cover.jpg"
-                                             alt="{{ book.title }}"
-                                             onerror="this.src='{{ url_for('static', path='img/book/default.jpg') }}'"
-                                             style="height: 300px; object-fit: cover;">
-                                    </a>
-                                </div>
-                                <div class="properties-caption">
-                                    <h3><a href="/book/{{ book.id }}">{{ book.title }}</a></h3>
-                                    <p>{{ book.author }}</p>
-                                    <div class="properties-footer">
-                                        <div class="price">
-                                            <span>{{ "{:,.0f}".format(book.price|float) if book.price else "رایگان" }} تومان</span>
-                                        </div>
-                                    </div>
-                                    <a href="/book/{{ book.id }}" class="btn btn-sm btn-primary mt-2">مشاهده</a>
-                                </div>
-                            </div>
-                        </div>
+            <div class="col-xl-12 mb-30">
+                <form action="/search" method="get" class="form-box" style="max-width: 520px;">
+                    <input type="text" name="q" placeholder="جستجوی کتاب..." value="{{ query }}">
+                    <div class="search-icon">
+                        <button type="submit" style="border:0;background:transparent;cursor:pointer;"><i class="ti-search"></i></button>
                     </div>
-                    {% else %}
-                    <div class="col-12 text-center">
-                        <h3>هیچ نتیجه‌ای یافت نشد.</h3>
-                    </div>
-                    {% endfor %}
-                </div>
+                </form>
             </div>
         </div>
+        <div class="row">
+            {% for book in books %}
+                <div class="col-xl-3 col-lg-3 col-md-4 col-sm-6">
+                    {{ book_card(book) }}
+                </div>
+            {% else %}
+                <div class="col-12 text-center py-5">
+                    <p>نتیجه‌ای یافت نشد.</p>
+                </div>
+            {% endfor %}
+        </div>
+
+        {% if total_pages and total_pages > 1 %}
+        <div class="pagination-kabana">
+            {% if page > 1 %}
+                <a href="/search?q={{ query|urlencode }}&page={{ page - 1 }}">قبلی</a>
+            {% endif %}
+            <span class="active">{{ page }} / {{ total_pages }}</span>
+            {% if page < total_pages %}
+                <a href="/search?q={{ query|urlencode }}&page={{ page + 1 }}">بعدی</a>
+            {% endif %}
+        </div>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

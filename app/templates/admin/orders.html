@@ -1,0 +1,55 @@
+{% extends "admin/base.html" %}
+{% block title %}سفارش‌ها{% endblock %}
+{% block content %}
+<h1>سفارش‌ها و تراکنش‌ها</h1>
+<form class="filters" method="get">
+    <select name="status_filter">
+        <option value="">همه وضعیت‌ها</option>
+        {% for s in statuses %}
+        <option value="{{ s }}" {% if status_filter == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+    </select>
+    <button class="btn" type="submit">فیلتر</button>
+</form>
+<p>{{ total }} سفارش</p>
+<table>
+    <thead>
+        <tr>
+            <th>شناسه</th>
+            <th>کاربر</th>
+            <th>مبلغ</th>
+            <th>وضعیت</th>
+            <th>trackId</th>
+            <th>ref</th>
+            <th>کتاب‌ها</th>
+            <th>تاریخ</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for o in orders %}
+        <tr>
+            <td>{{ o.id }}</td>
+            <td>{% if o.user %}{{ o.user.phone }}{% else %}—{% endif %}</td>
+            <td dir="ltr">{{ "{:,.0f}".format(o.total_amount|float) if o.total_amount else 0 }}</td>
+            <td>{{ o.status.value }}</td>
+            <td dir="ltr">{{ o.payment_gateway_transaction_id or '—' }}</td>
+            <td dir="ltr">{{ o.payment_gateway_ref_id or '—' }}</td>
+            <td>
+                {% for item in o.items %}
+                    {{ item.book.title if item.book else item.book_id }}{% if not loop.last %}، {% endif %}
+                {% endfor %}
+            </td>
+            <td>{{ o.created_at }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8">سفارشی نیست</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% if total_pages and total_pages > 1 %}
+<div class="pager">
+    {% if page > 1 %}<a class="btn btn-secondary" href="/admin/orders?status_filter={{ status_filter }}&page={{ page-1 }}">قبلی</a>{% endif %}
+    {% if page < total_pages %}<a class="btn btn-secondary" href="/admin/orders?status_filter={{ status_filter }}&page={{ page+1 }}">بعدی</a>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import hashlib
+import random
 import re
 import sqlite3
 import sys
@@ -13,7 +14,6 @@ from pathlib import Path
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
-# Ensure project root is on sys.path when run as a script
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -23,10 +23,10 @@ from app.config import settings  # noqa: E402
 from app.models import Book, User, UserRole  # noqa: E402
 
 BACKUP_DB = ROOT / "books_data_backup.db"
-DEFAULT_ADMIN_USERNAME = "admin"
-DEFAULT_ADMIN_EMAIL = "admin@kabana.local"
+DEFAULT_ADMIN_PHONE = "09153276607"
 DEFAULT_ADMIN_PASSWORD = "admin123"
-DEFAULT_ADMIN_FULL_NAME = "Kabana Admin"
+DEFAULT_ADMIN_FIRST_NAME = "مدیر"
+DEFAULT_ADMIN_LAST_NAME = "سیستم"
 
 
 def sanitize_filename(name: str) -> str:
@@ -50,6 +50,14 @@ def parse_price(raw: str | None) -> Decimal:
 def make_folder_name(title: str, url: str) -> str:
     digest = hashlib.md5(url.encode("utf-8")).hexdigest()[:6]
     return f"{sanitize_filename(title)}_{digest}"
+
+
+def apply_dual_pricing(raw_price: Decimal) -> tuple[Decimal, Decimal]:
+    """Sale price 2-3k below source; original 30-40k above sale."""
+    discount = Decimal(random.randint(2000, 3000))
+    price = max(Decimal("0"), raw_price - discount)
+    original = price + Decimal(random.randint(30000, 40000))
+    return price, original
 
 
 def seed_books(session: Session, sqlite_path: Path) -> int:
@@ -82,13 +90,15 @@ def seed_books(session: Session, sqlite_path: Path) -> int:
             continue
 
         title = (row["title_fa"] or row["title_en"] or "بدون عنوان").strip()
-        # Strip BOM / weird leading chars from scraper output
         title = title.lstrip("\ufeff").strip()
 
         folder_name = make_folder_name(title, url)
         if folder_name in seen_folders:
             folder_name = f"{folder_name}_{len(seen_folders)}"
         seen_folders.add(folder_name)
+
+        raw_price = parse_price(row["price"])
+        price, original_price = apply_dual_pricing(raw_price)
 
         books.append(
             Book(
@@ -104,12 +114,15 @@ def seed_books(session: Session, sqlite_path: Path) -> int:
                 file_format=row["file_format"] or "pdf",
                 file_size=row["file_size"],
                 edition=row["edition"],
-                price=parse_price(row["price"]),
+                price=price,
+                original_price=original_price,
                 availability=row["availability"],
                 amazon_link=row["amazon_link"],
                 image_url=row["image_url"],
                 description=row["description"],
                 folder_name=folder_name,
+                cover_filename="cover.jpg",
+                has_pdf=False,
                 is_active=True,
             )
         )
@@ -121,28 +134,26 @@ def seed_books(session: Session, sqlite_path: Path) -> int:
 
 
 def seed_admin(session: Session) -> None:
-    existing = session.scalar(
-        select(User).where(
-            (User.username == DEFAULT_ADMIN_USERNAME) | (User.email == DEFAULT_ADMIN_EMAIL)
-        )
-    )
+    existing = session.scalar(select(User).where(User.phone == DEFAULT_ADMIN_PHONE))
     if existing:
         print(f"Admin user already exists (id={existing.id}) — skipping.")
         return
 
     admin = User(
-        email=DEFAULT_ADMIN_EMAIL,
-        username=DEFAULT_ADMIN_USERNAME,
+        email="admin@kabana.local",
+        username="admin",
         hashed_password=get_password_hash(DEFAULT_ADMIN_PASSWORD),
-        full_name=DEFAULT_ADMIN_FULL_NAME,
-        phone="09016513748",
+        first_name=DEFAULT_ADMIN_FIRST_NAME,
+        last_name=DEFAULT_ADMIN_LAST_NAME,
+        full_name=f"{DEFAULT_ADMIN_FIRST_NAME} {DEFAULT_ADMIN_LAST_NAME}",
+        phone=DEFAULT_ADMIN_PHONE,
         is_active=True,
         role=UserRole.ADMIN,
     )
     session.add(admin)
     session.commit()
     print(
-        f"Created admin user '{DEFAULT_ADMIN_USERNAME}' "
+        f"Created admin user phone={DEFAULT_ADMIN_PHONE} "
         f"(password: {DEFAULT_ADMIN_PASSWORD})."
     )
 
