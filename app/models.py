@@ -20,15 +20,17 @@ from app.database import Base
 
 
 class UserRole(str, enum.Enum):
-    ADMIN = "admin"
-    USER = "user"
+    # Values must match PostgreSQL enum labels from Alembic migration
+    ADMIN = "ADMIN"
+    USER = "USER"
 
 
 class OrderStatus(str, enum.Enum):
-    PENDING = "pending"
-    PAID = "paid"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
+    # Values must match PostgreSQL enum labels from Alembic migration
+    PENDING = "PENDING"
+    PAID = "PAID"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
 
 
 class Book(Base):
@@ -83,7 +85,10 @@ class User(Base):
     full_name = Column(String)
     phone = Column(String)
     is_active = Column(Boolean, default=True)
-    role = Column(SQLEnum(UserRole), default=UserRole.USER)
+    role = Column(
+        SQLEnum(UserRole, name="userrole", values_callable=lambda x: [e.value for e in x]),
+        default=UserRole.USER,
+    )
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
@@ -96,7 +101,14 @@ class Order(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    status = Column(SQLEnum(OrderStatus), default=OrderStatus.PENDING)
+    status = Column(
+        SQLEnum(
+            OrderStatus,
+            name="orderstatus",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        default=OrderStatus.PENDING,
+    )
     total_amount = Column(Numeric(10, 2))
     payment_gateway_transaction_id = Column(String, nullable=True)
     payment_gateway_ref_id = Column(String, nullable=True)
