@@ -1,18 +1,15 @@
 {% extends "base.html" %}
+{% from "macros.html" import dual_price %}
 
-{% block title %}کابانا - {{ book.title }}{% endblock %}
+{% block title %}{{ book.title or 'جزئیات کتاب' }} — کابانا{% endblock %}
 
 {% block content %}
 <div class="breadcrumb-items">
     <div class="row">
         <ul class="breadcrumb">
-            <li>
-                <a href="/" class="breadcrumb-link">صفحه اصلی</a>
-            </li>
+            <li><a href="/" class="breadcrumb-link">صفحه اصلی</a></li>
             <li class="chevron"><span class="fa fa-chevron-left"></span></li>
-            <li>
-                <span class="breadcrumb-active">{{ book.title }}</span>
-            </li>
+            <li><span class="breadcrumb-active">جزئیات کتاب</span></li>
         </ul>
     </div>
 </div>
@@ -21,116 +18,54 @@
     <div class="container">
         <div class="row">
             <div class="col-xl-12">
-                <div class="row">
-                    <div class="col-xl-12">
+                <div class="single-book d-flex align-items-center mb-0 flex-wrap">
+                    <div class="book-img">
+                        <img src="/media/proxy/cover/{{ book.folder_name }}/{{ book.cover_filename or 'cover.jpg' }}"
+                             alt="{{ book.title }}"
+                             onerror="this.src='{{ url_for('static', path='img/gallery/best_selling1.jpg') }}'">
+                    </div>
+                    <div class="book-caption">
+                        <h3>{{ book.title or 'بدون عنوان' }}</h3>
+                        {% if book.title_en %}<p>{{ book.title_en }}</p>{% endif %}
+                        <p>نویسنده: <strong>{{ book.author or '—' }}</strong></p>
+                        <p>ناشر: <strong>{{ book.publisher or '—' }}</strong></p>
+                        {% if book.publish_year %}<p>سال نشر: {{ book.publish_year }}</p>{% endif %}
+                        {% if book.pages %}<p>تعداد صفحات: {{ book.pages }}</p>{% endif %}
+                        {% if book.isbn %}<p>ISBN: {{ book.isbn }}</p>{% endif %}
 
-                        <div class="single-book d-flex align-items-center mb-0">
-                            <div class="book-img">
-                                <img src="/media/proxy/cover/{{ book.folder_name }}/cover.jpg"
-                                     alt="{{ book.title }}"
-                                     onerror="this.src='{{ url_for('static', path='img/book/default.jpg') }}'"
-                                     style="max-width: 300px;">
-                            </div>
-                            <div class="book-caption">
-                                <h3>{{ book.title }}</h3>
+                        {{ dual_price(book) }}
 
-                                <div class="review">
-                                    <div class="rating">
-                                        <i class="fas fa-star"></i>
-                                        <i class="fas fa-star"></i>
-                                        <i class="fas fa-star"></i>
-                                        <i class="fas fa-star"></i>
-                                        <i class="fas fa-star-half-alt"></i>
-                                    </div>
-                                    <!-- Placeholder for reviews -->
-                                    <p>(<span>0</span> نظر)</p>
-                                </div>
-
-                                <p>نویسنده: <a href="#">{{ book.author }}</a></p>
-                                {% if book.publisher %}
-                                <p>ناشر: <a href="#">{{ book.publisher }}</a></p>
+                        <div class="mt-3">
+                            {% if owned %}
+                                {% if book.has_pdf and token %}
+                                    <a href="/media/proxy/book/{{ book.folder_name }}/{{ filename }}?token={{ token }}"
+                                       class="white-btn mr-10">دانلود کتاب</a>
+                                {% else %}
+                                    <span class="border-btn">خریداری شده — فایل به‌زودی</span>
                                 {% endif %}
-                                <div class="price">
-                                    <p>{{ "{:,.0f}".format(book.price|float) if book.price else "رایگان" }} <span>تومان</span></p>
-                                </div>
-
-                                <!-- Secure Download Link -->
-                                <a href="/media/proxy/book/{{ book.folder_name }}/{{ filename }}?token={{ token }}" class="btn btn-primary mr-10">
-                                    دانلود فایل ({{ book.file_format }})
-                                </a>
-
-                                <!-- Placeholder buttons -->
-                                <a href="#" class="border-btn book-btn share-btn"><i class="fas fa-share-alt"></i></a>
-                            </div>
+                            {% elif not current_user %}
+                                <a href="/auth/login?next=/book/{{ book.id }}" class="white-btn mr-10">ورود برای خرید</a>
+                            {% elif not book.has_pdf %}
+                                <span class="border-btn">فعلاً موجود نیست</span>
+                            {% else %}
+                                <form action="/payment/buy/{{ book.id }}" method="post" style="display:inline;">
+                                    <button type="submit" class="white-btn mr-10">خرید و دانلود</button>
+                                </form>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        {% if book.description %}
+        <div class="row mt-50">
+            <div class="col-xl-12">
+                <div class="section-tittle mb-30"><h2>درباره کتاب</h2></div>
+                <p style="line-height: 2; white-space: pre-wrap;">{{ book.description }}</p>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
-
-<section class="our-client section-padding best-selling">
-    <div class="container">
-        <div class="row">
-            <div class="offset-xl-1 col-xl-10">
-                <div class="nav-button f-right">
-                    <nav>
-                        <div class="nav nav-tabs " id="nav-tab" role="tablist">
-                            <a class="nav-link active" id="nav-one-tab" data-bs-toggle="tab" href="#nav-one"
-                                role="tab" aria-controls="nav-one" aria-selected="true">توضیحات</a>
-                            <a class="nav-link" id="nav-two-tab" data-bs-toggle="tab" href="#nav-two" role="tab"
-                                aria-controls="nav-two" aria-selected="false">مشخصات کتاب</a>
-                        </div>
-                    </nav>
-
-                </div>
-            </div>
-        </div>
-        <div class="container">
-
-            <div class="tab-content" id="nav-tabContent">
-                <div class="tab-pane fade show active" id="nav-one" role="tabpanel" aria-labelledby="nav-one-tab">
-                    <div class="row">
-                        <div class="desc-tab offset-xl-1 col-lg-9">
-                            <p>{{ book.description | default('توضیحاتی برای این کتاب ثبت نشده است.', true) }}</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="tab-pane fade" id="nav-two" role="tabpanel" aria-labelledby="nav-two-tab">
-                    <div class="row">
-                        <div class="table-book offset-xl-1 col-lg-9">
-                            <table class="details">
-                                <thead>
-                                    <tr>
-                                        <th class="first">نام کتاب</th>
-                                        <th class="second">{{ book.title }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td class="first">نویسنده</td>
-                                        <td class="second">{{ book.author }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="first">ناشر</td>
-                                        <td class="second">{{ book.publisher }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="first">شابک</td>
-                                        <td class="second">{{ book.isbn }}</td>
-                                    </tr>
-                                    <tr>
-                                        <td class="first">فرمت</td>
-                                        <td class="second">{{ book.file_format }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</section>
 {% endblock %}

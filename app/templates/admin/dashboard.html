@@ -1,0 +1,16 @@
+{% extends "admin/base.html" %}
+{% block title %}داشبورد{% endblock %}
+{% block content %}
+<h1>داشبورد</h1>
+<p>خوش آمدید {{ admin.display_name }}</p>
+<div class="cards">
+    <div class="card"><div class="num">{{ "{:,.0f}".format(stats.sales_today|float) }}</div><div class="label">فروش امروز (تومان)</div></div>
+    <div class="card"><div class="num">{{ "{:,.0f}".format(stats.sales_month|float) }}</div><div class="label">فروش این ماه</div></div>
+    <div class="card"><div class="num">{{ stats.orders }}</div><div class="label">سفارش‌های موفق</div></div>
+    <div class="card"><div class="num">{{ stats.books }}</div><div class="label">کل کتاب‌ها</div></div>
+    <div class="card"><div class="num">{{ stats.missing_pdf }}</div><div class="label">بدون PDF</div></div>
+    <div class="card"><div class="num">{{ stats.users }}</div><div class="label">کاربران</div></div>
+</div>
+<p><a class="btn" href="/admin/books?missing_pdf=1">آپلود PDFهای مفقود</a>
+<a class="btn btn-secondary" href="/admin/reports">گزارش فروش</a></p>
+{% endblock %}

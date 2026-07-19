@@ -41,7 +41,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 Open http://127.0.0.1:8000 — health check: http://127.0.0.1:8000/health
 
-**Seeded admin:** `admin` / `admin123` (email: `admin@kabana.local`)
+**Seeded admin:** phone `09153276607` / password `admin123` (پنل: `/admin/`)
 
 ### Local `.env` highlights
 
@@ -52,7 +52,18 @@ SYNC_DATABASE_URL=postgresql://kabana_user:kabana_pass@127.0.0.1:5432/kabana_db
 MEDIA_ROOT=/absolute/path/to/storage
 FTP_ENABLED=False
 SECRET_KEY=change_me
+ZIBAL_MERCHANT=zibal
+ZIBAL_CALLBACK_URL=http://127.0.0.1:8000/payment/callback
+BASE_URL=http://127.0.0.1:8000
 ```
+
+### Features (vertical slice)
+
+- Kabana Jinja storefront: home, search (paginated + trigram indexes), book detail, dual pricing
+- Auth with Iranian mobile + password (register/login)
+- Zibal sandbox checkout (`merchant=zibal`) → owned library + gated PDF download
+- Admin panel: books (filter missing PDF + upload to FTP), users, orders, date-range reports
+- Scraper stores sale price 2–3k below source and strikethrough original 30–40k above
 
 ## Docker Compose (when Docker is available)
 

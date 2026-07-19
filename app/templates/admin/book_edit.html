@@ -1,0 +1,27 @@
+{% extends "admin/base.html" %}
+{% block title %}ویرایش کتاب{% endblock %}
+{% block content %}
+<h1>ویرایش کتاب #{{ book.id }}</h1>
+{% if error %}<div class="msg" style="background:#fecaca;color:#991b1b;">{{ error }}</div>{% endif %}
+<form method="post" action="/admin/books/{{ book.id }}">
+    <p><label>عنوان<br><input name="title" value="{{ book.title or '' }}" style="width:100%;max-width:480px;" required></label></p>
+    <p><label>نویسنده<br><input name="author" value="{{ book.author or '' }}" style="width:100%;max-width:480px;"></label></p>
+    <p><label>ناشر<br><input name="publisher" value="{{ book.publisher or '' }}" style="width:100%;max-width:480px;"></label></p>
+    <p><label>قیمت فروش (تومان)<br><input name="price" value="{{ book.price or 0 }}" dir="ltr"></label></p>
+    <p><label>قیمت اصلی خط‌خورده<br><input name="original_price" value="{{ book.original_price or '' }}" dir="ltr"></label></p>
+    <p><label>توضیحات<br><textarea name="description" rows="8" style="width:100%;max-width:640px;">{{ book.description or '' }}</textarea></label></p>
+    <p><label><input type="checkbox" name="is_active" {% if book.is_active %}checked{% endif %}> فعال</label></p>
+    <p>
+        <button class="btn" type="submit">ذخیره</button>
+        <a class="btn btn-secondary" href="/admin/books">بازگشت</a>
+    </p>
+</form>
+{% if not book.has_pdf %}
+<hr>
+<h2>آپلود PDF</h2>
+<form action="/admin/books/{{ book.id }}/upload" method="post" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".pdf,application/pdf" required>
+    <button class="btn" type="submit">آپلود به FTP</button>
+</form>
+{% endif %}
+{% endblock %}

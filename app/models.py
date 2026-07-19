@@ -9,12 +9,11 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
-    Index
+    Index,
 )
 from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from sqlalchemy.dialects.postgresql import TSVECTOR
 
 from app.database import Base
 
@@ -48,18 +47,20 @@ class Book(Base):
     pages = Column(String)
     description = Column(Text)
     price = Column(Numeric(10, 2))
+    original_price = Column(Numeric(10, 2), nullable=True)
 
     # File Management
     folder_name = Column(String, unique=True, index=True)
+    cover_filename = Column(String, default="cover.jpg")
     file_format = Column(String, default="pdf")
     file_size = Column(String)
     edition = Column(String)
     availability = Column(String)
     amazon_link = Column(String)
     image_url = Column(String)
+    has_pdf = Column(Boolean, default=False, server_default="false", index=True)
 
     # Status
-    # Ensure server_default is set so raw SQL inserts get true if omitted
     is_active = Column(Boolean, default=True, server_default="true")
 
     # Timestamps
@@ -69,21 +70,32 @@ class Book(Base):
     # Relationships
     order_items = relationship("OrderItem", back_populates="book")
 
-    # Composite Index for Search
     __table_args__ = (
-        Index('ix_books_search_composite', 'title', 'author', 'publisher', postgresql_using='btree'),
+        Index(
+            "ix_books_search_composite",
+            "title",
+            "author",
+            "publisher",
+            postgresql_using="btree",
+        ),
     )
+
+    @property
+    def pdf_filename(self) -> str:
+        return f"book.{self.file_format or 'pdf'}"
 
 
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    email = Column(String, unique=True, index=True)
-    username = Column(String, unique=True, index=True)
-    hashed_password = Column(String)
-    full_name = Column(String)
-    phone = Column(String)
+    email = Column(String, unique=True, index=True, nullable=True)
+    username = Column(String, unique=True, index=True, nullable=True)
+    hashed_password = Column(String, nullable=False)
+    first_name = Column(String, nullable=False, default="")
+    last_name = Column(String, nullable=False, default="")
+    full_name = Column(String, nullable=True)  # kept for backward compatibility
+    phone = Column(String, unique=True, index=True, nullable=False)
     is_active = Column(Boolean, default=True)
     role = Column(
         SQLEnum(UserRole, name="userrole", values_callable=lambda x: [e.value for e in x]),
@@ -95,12 +107,19 @@ class User(Base):
     orders = relationship("Order", back_populates="user")
     download_links = relationship("DownloadLink", back_populates="user")
 
+    @property
+    def display_name(self) -> str:
+        name = f"{self.first_name or ''} {self.last_name or ''}".strip()
+        if name:
+            return name
+        return self.full_name or self.phone or "کاربر"
+
 
 class Order(Base):
     __tablename__ = "orders"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     status = Column(
         SQLEnum(
             OrderStatus,
@@ -110,7 +129,7 @@ class Order(Base):
         default=OrderStatus.PENDING,
     )
     total_amount = Column(Numeric(10, 2))
-    payment_gateway_transaction_id = Column(String, nullable=True)
+    payment_gateway_transaction_id = Column(String, nullable=True, index=True)
     payment_gateway_ref_id = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     paid_at = Column(DateTime(timezone=True), nullable=True)

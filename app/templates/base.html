@@ -5,11 +5,10 @@
     <meta charset="utf-8">
     <meta http-equiv="x-ua-compatible" content="ie=edge">
     <title>{% block title %}فروشگاه کتاب کابانا{% endblock %}</title>
-    <meta name="description" content="">
+    <meta name="description" content="فروشگاه آنلاین کتاب دیجیتال کابانا">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="shortcut icon" type="image/x-icon" href="{{ url_for('static', path='img/logo/favicon.png') }}">
 
-    <!-- CSS here -->
     <link rel="stylesheet" href="{{ url_for('static', path='css/bootstrap.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='css/owl.carousel.min.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='css/slicknav.css') }}">
@@ -20,12 +19,20 @@
     <link rel="stylesheet" href="{{ url_for('static', path='css/slick.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='css/nice-select.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', path='css/style.css') }}">
-
     <style>
-        /* Basic RTL Fixes if needed */
-        body { font-family: 'IRANSans', sans-serif; text-align: right; direction: rtl; }
-        .header-bottom .logo, .header-bottom .main-menu { float: right; }
-        .header-right { float: left; }
+        body { font-family: 'IRANSans', Tahoma, sans-serif; text-align: right; direction: rtl; }
+        .price-dual .old-price {
+            text-decoration: line-through;
+            color: #999;
+            font-size: 0.9em;
+            margin-left: 8px;
+        }
+        .price-dual .sale-price { color: #c0392b; font-weight: 700; }
+        .pagination-kabana { display: flex; gap: 8px; justify-content: center; margin: 30px 0; flex-wrap: wrap; }
+        .pagination-kabana a, .pagination-kabana span {
+            padding: 8px 14px; border: 1px solid #ddd; border-radius: 4px; color: #333; text-decoration: none;
+        }
+        .pagination-kabana .active { background: #50b848; color: #fff; border-color: #50b848; }
     </style>
     {% block head %}{% endblock %}
 </head>
@@ -33,29 +40,32 @@
 <body>
     <header>
         <div class="header-area">
-            <div class="main-header ">
-                <div class="header-top ">
+            <div class="main-header">
+                <div class="header-top">
                     <div class="container">
                         <div class="row">
                             <div class="col-xl-12">
                                 <div class="d-flex justify-content-between align-items-center flex-sm">
                                     <div class="header-info-left d-flex align-items-center">
-
                                         <div class="logo">
-                                            <a href="/"><img src="{{ url_for('static', path='img/logo/logo.png') }}" alt=""></a>
+                                            <a href="/"><img src="{{ url_for('static', path='img/logo/logo.png') }}" alt="کابانا"></a>
                                         </div>
-
                                         <form action="/search" method="get" class="form-box">
-                                            <input type="text" name="q" placeholder="جستجوی کتاب..." value="{{ query|default('') }}">
+                                            <input type="text" name="q" placeholder="جستجوی کتاب، نویسنده یا ناشر..." value="{{ query|default('') }}">
                                             <div class="search-icon">
-                                                <i class="ti-search"></i>
+                                                <button type="submit" style="border:0;background:transparent;cursor:pointer;" aria-label="جستجو">
+                                                    <i class="ti-search"></i>
+                                                </button>
                                             </div>
                                         </form>
                                     </div>
                                     <div class="header-info-right d-flex align-items-center">
                                         <ul>
                                             {% if current_user %}
-                                                <li><a href="/auth/me">{{ current_user.username }}</a></li>
+                                                <li><a href="/profile">{{ current_user.display_name }}</a></li>
+                                                {% if current_user.role.value == 'ADMIN' %}
+                                                    <li><a href="/admin/">پنل ادمین</a></li>
+                                                {% endif %}
                                                 <li><a href="/auth/logout" class="btn header-btn">خروج</a></li>
                                             {% else %}
                                                 <li><a href="/auth/login" class="btn header-btn">ورود</a></li>
@@ -67,27 +77,27 @@
                         </div>
                     </div>
                 </div>
-                <div class="header-bottom  header-sticky">
+                <div class="header-bottom header-sticky">
                     <div class="container">
                         <div class="row align-items-center">
                             <div class="col-xl-12">
-
                                 <div class="logo2">
-                                    <a href="/"><img src="{{ url_for('static', path='img/logo/logo.png') }}" alt=""></a>
+                                    <a href="/"><img src="{{ url_for('static', path='img/logo/logo.png') }}" alt="کابانا"></a>
                                 </div>
-
                                 <div class="main-menu text-center d-none d-lg-block">
                                     <nav>
                                         <ul id="navigation" class="menu">
                                             <li><a href="/">صفحه اصلی</a></li>
                                             <li><a href="/search">کتاب‌ها</a></li>
-                                            <li><a href="#">درباره ما</a></li>
-                                            <li><a href="#">تماس با ما</a></li>
+                                            {% if current_user %}
+                                                <li><a href="/profile">کتابخانه من</a></li>
+                                            {% else %}
+                                                <li><a href="/auth/register">ثبت‌نام</a></li>
+                                            {% endif %}
                                         </ul>
                                     </nav>
                                 </div>
                             </div>
-
                             <div class="col-xl-12">
                                 <div class="mobile_menu d-block d-lg-none"></div>
                             </div>
@@ -107,16 +117,14 @@
             <div class="footer-area footer-padding">
                 <div class="container">
                     <div class="row justify-content-between">
-                        <div class="col-xl-3 col-lg-5 col-md-4 col-sm-6">
+                        <div class="col-xl-4 col-lg-5 col-md-6">
                             <div class="single-footer-caption mb-50">
-                                <div class="single-footer-caption mb-30">
-                                    <div class="footer-logo mb-25">
-                                        <a href="/"><img src="{{ url_for('static', path='img/logo/logo2_footer.png') }}" alt=""></a>
-                                    </div>
-                                    <div class="footer-tittle">
-                                        <div class="footer-pera">
-                                            <p>فروشگاه آنلاین کتاب کابانا</p>
-                                        </div>
+                                <div class="footer-logo mb-25">
+                                    <a href="/"><img src="{{ url_for('static', path='img/logo/logo2_footer.png') }}" alt="کابانا"></a>
+                                </div>
+                                <div class="footer-tittle">
+                                    <div class="footer-pera">
+                                        <p>فروشگاه آنلاین کتاب دیجیتال کابانا — خرید امن و دانلود فوری</p>
                                     </div>
                                 </div>
                             </div>
@@ -128,9 +136,9 @@
                 <div class="container">
                     <div class="footer-border">
                         <div class="row d-flex align-items-center">
-                            <div class="col-xl-12 ">
+                            <div class="col-xl-12">
                                 <div class="footer-copy-right text-center">
-                                    Copyright &copy; All rights reserved
+                                    Copyright &copy; کابانا — تمامی حقوق محفوظ است
                                 </div>
                             </div>
                         </div>
@@ -144,7 +152,6 @@
         <a title="Go to Top" href="#"> <i class="fas fa-level-up-alt"></i></a>
     </div>
 
-    <!-- JS here -->
     <script src="{{ url_for('static', path='js/modernizr-3.5.0.min.js') }}"></script>
     <script src="{{ url_for('static', path='js/jquery-1.12.4.min.js') }}"></script>
     <script src="{{ url_for('static', path='js/popper.min.js') }}"></script>
@@ -157,14 +164,8 @@
     <script src="{{ url_for('static', path='js/jquery.nice-select.min.js') }}"></script>
     <script src="{{ url_for('static', path='js/jquery.counterup.min.js') }}"></script>
     <script src="{{ url_for('static', path='js/waypoints.min.js') }}"></script>
-    <script src="{{ url_for('static', path='js/contact.js') }}"></script>
-    <script src="{{ url_for('static', path='js/jquery.form.js') }}"></script>
-    <script src="{{ url_for('static', path='js/jquery.validate.min.js') }}"></script>
-    <script src="{{ url_for('static', path='js/mail-script.js') }}"></script>
-    <script src="{{ url_for('static', path='js/jquery.ajaxchimp.min.js') }}"></script>
     <script src="{{ url_for('static', path='js/plugins.js') }}"></script>
     <script src="{{ url_for('static', path='js/main.js') }}"></script>
-
     {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = "secret"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 days for better UX
 
     # File Storage
     MEDIA_ROOT: str = "/app/storage"
@@ -33,6 +33,13 @@ class Settings(BaseSettings):
 
     # Frontend
     DOMAIN_NAME: str = "kabana.local"
+    # Kabana theme license (Rightel / راست‌چین)
+    KABANA_LICENSE: str = "56417913883"
+
+    # Zibal payment gateway (use merchant=zibal for sandbox)
+    ZIBAL_MERCHANT: str = "zibal"
+    ZIBAL_CALLBACK_URL: str = "http://localhost:8000/payment/callback"
+    BASE_URL: str = "http://localhost:8000"
 
     class Config:
         env_file = ".env"
@@ -50,7 +57,6 @@ class Settings(BaseSettings):
         if self.LINK_BASE_PORT != 21:
             port_part = f":{self.LINK_BASE_PORT}"
 
-        # Remove leading slash if present
         clean_path = remote_path.lstrip("/")
 
         return f"{self.LINK_BASE_PROTOCOL}://{auth_part}{self.LINK_BASE_HOST}{port_part}/{clean_path}"

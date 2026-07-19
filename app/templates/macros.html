@@ -1,0 +1,34 @@
+{% macro dual_price(book) -%}
+<div class="price price-dual">
+    {% if book.original_price and book.price and book.original_price > book.price %}
+        <span class="old-price">{{ "{:,.0f}".format(book.original_price|float) }} تومان</span>
+        <span class="sale-price">{{ "{:,.0f}".format(book.price|float) }} تومان</span>
+    {% elif book.price %}
+        <span class="sale-price">{{ "{:,.0f}".format(book.price|float) }} تومان</span>
+    {% else %}
+        <span class="sale-price">رایگان</span>
+    {% endif %}
+</div>
+{%- endmacro %}
+
+{% macro book_card(book) -%}
+<div class="properties pb-20">
+    <div class="properties-card">
+        <div class="properties-img">
+            <a href="/book/{{ book.id }}">
+                <img src="/media/proxy/cover/{{ book.folder_name }}/{{ book.cover_filename or 'cover.jpg' }}"
+                     alt="{{ book.title }}"
+                     onerror="this.src='{{ url_for('static', path='img/gallery/best_selling1.jpg') }}'"
+                     loading="lazy">
+            </a>
+        </div>
+        <div class="properties-caption">
+            <h3><a href="/book/{{ book.id }}">{{ book.title or 'بدون عنوان' }}</a></h3>
+            <p>{{ book.author or 'نویسنده نامشخص' }}</p>
+            <div class="properties-footer">
+                {{ dual_price(book) }}
+            </div>
+        </div>
+    </div>
+</div>
+{%- endmacro %}

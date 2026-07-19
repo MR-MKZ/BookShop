@@ -1,77 +1,47 @@
 {% extends "base.html" %}
+{% from "macros.html" import book_card %}
 
-{% block title %}فروشگاه کتاب کابانا - خانه{% endblock %}
+{% block title %}کابانا — فروشگاه کتاب دیجیتال{% endblock %}
 
 {% block content %}
-<div class="slider-area home">
-    <div class="container">
-        <div class="row">
-            <div class="col-xl-12">
-                <div class="hero-caption text-center" style="padding: 100px 0;">
-                    <h1 data-animation="fadeInUp" data-delay=".4s">به کتابفروشی کابانا خوش آمدید</h1>
-                    <p data-animation="fadeInUp" data-delay=".6s">مرجع دانلود کتاب‌های دیجیتال</p>
+<div class="slider-area">
+    <div class="slider-active">
+        <div class="single-slider slider-height slider-bg1 d-flex align-items-center">
+            <div class="container">
+                <div class="row">
+                    <div class="col-xxl-5 col-xl-6 col-lg-7 col-md-8">
+                        <div class="hero-caption">
+                            <h1 data-animation="fadeInUp" data-delay=".4s">کابانا</h1>
+                            <p data-animation="fadeInUp" data-delay=".6s">فروشگاه کتاب دیجیتال — جستجو کنید و فوری دانلود کنید</p>
+                            <a href="/search" class="btn hero-btn" data-animation="bounceIn" data-delay=".8s">جستجوی کتاب</a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="best-selling section-bg">
+<div class="best-selling section-bg" style="padding-top: 70px; padding-bottom: 70px;">
     <div class="container">
         <div class="row justify-content-center">
             <div class="col-xl-7 col-lg-8">
                 <div class="section-tittle text-center mb-55">
-                    <h2>تازه‌ترین کتاب‌ها</h2>
+                    <h2>جدیدترین کتاب‌ها</h2>
                 </div>
             </div>
         </div>
         <div class="row">
-            <div class="col-xl-12">
-                <div class="selling-active">
-                    <!-- Loop through books passed from backend -->
-                    {% for book in books %}
-                    <div class="properties pb-20">
-                        <div class="properties-card">
-                            <div class="properties-img">
-                                <a href="/book/{{ book.id }}">
-                                    <!-- Use media proxy for cover -->
-                                    <img src="/media/proxy/cover/{{ book.folder_name }}/cover.jpg"
-                                         alt="{{ book.title }}"
-                                         onerror="this.src='{{ url_for('static', path='img/book/default.jpg') }}'"
-                                         style="height: 300px; object-fit: cover;">
-                                </a>
-                            </div>
-                            <div class="properties-caption">
-                                <h3 class="text-truncate"><a href="/book/{{ book.id }}">{{ book.title }}</a></h3>
-                                <a href="#" class="author text-truncate d-block">{{ book.author }}</a>
-                                <div class="properties-footer">
-                                    <div class="price">
-                                        <p>{{ "{:,.0f}".format(book.price|float) if book.price else "رایگان" }} <span>تومان</span></p>
-                                    </div>
-                                    <a href="/book/{{ book.id }}" class="btn btn-sm btn-primary mt-2">جزئیات</a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% else %}
-                    <div class="col-12 text-center">
-                        <p>هیچ کتابی یافت نشد.</p>
-                    </div>
-                    {% endfor %}
+            {% for book in books %}
+                <div class="col-xl-3 col-lg-3 col-md-4 col-sm-6">
+                    {{ book_card(book) }}
                 </div>
-            </div>
+            {% else %}
+                <div class="col-12 text-center">
+                    <p>هنوز کتابی ثبت نشده است.</p>
+                </div>
+            {% endfor %}
         </div>
     </div>
 </div>
-
-<style>
-    .text-truncate {
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .properties-caption h3 {
-        min-height: 2em; /* Ensure consistent height */
-    }
-</style>
 {% endblock %}

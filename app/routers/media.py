@@ -135,22 +135,21 @@ async def proxy_cover(folder_name: str, filename: str):
 async def proxy_book(folder_name: str, filename: str, token: str = Query(...)):
     """
     Protected access to book files with timed token.
+    Token must include matching folder/filename and optionally user_id/book_id.
     """
     try:
-        # Validate token (validity: 1 hour = 3600 seconds)
         data = signer.loads(token, salt="pdf-download", max_age=3600)
 
-        # Check if token matches the requested file
         if data.get("filename") != filename or data.get("folder") != folder_name:
             raise BadSignature("Token mismatch")
 
     except SignatureExpired:
-        raise HTTPException(status_code=403, detail="Download link expired.")
+        raise HTTPException(status_code=403, detail="لینک دانلود منقضی شده است")
     except BadSignature:
-        raise HTTPException(status_code=403, detail="Invalid token.")
+        raise HTTPException(status_code=403, detail="توکن نامعتبر است")
 
     if not await check_file_exists(folder_name, filename):
-        raise HTTPException(status_code=404, detail="File not found")
+        raise HTTPException(status_code=404, detail="فایل یافت نشد")
 
     return StreamingResponse(
         stream_media(folder_name, filename),

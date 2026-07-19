@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}پنل ادمین{% endblock %} — کابانا</title>
+    <style>
+        :root { --bg: #f4f6f8; --side: #1e293b; --accent: #50b848; --text: #1e293b; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: Tahoma, 'IRANSans', sans-serif; background: var(--bg); color: var(--text); direction: rtl; }
+        .layout { display: flex; min-height: 100vh; }
+        .sidebar { width: 220px; background: var(--side); color: #fff; padding: 20px 0; flex-shrink: 0; }
+        .sidebar a { display: block; color: #cbd5e1; text-decoration: none; padding: 12px 20px; }
+        .sidebar a:hover, .sidebar a.active { background: #334155; color: #fff; }
+        .sidebar .brand { padding: 0 20px 20px; font-weight: bold; font-size: 1.1rem; border-bottom: 1px solid #334155; margin-bottom: 10px; }
+        .main { flex: 1; padding: 24px; overflow-x: auto; }
+        h1, h2 { margin-top: 0; }
+        .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .card { background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .card .num { font-size: 1.5rem; font-weight: bold; color: var(--accent); }
+        .card .label { color: #64748b; font-size: .85rem; margin-top: 4px; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: .9rem; }
+        th { background: #f8fafc; }
+        .btn { display: inline-block; padding: 8px 14px; background: var(--accent); color: #fff; border: 0; border-radius: 6px; text-decoration: none; cursor: pointer; font-size: .85rem; }
+        .btn-secondary { background: #64748b; }
+        .btn-danger { background: #dc2626; }
+        .btn-sm { padding: 4px 10px; }
+        .filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+        input, select, textarea { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-family: inherit; }
+        .msg { background: #dcfce7; color: #166534; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .75rem; background: #e2e8f0; }
+        .badge-ok { background: #bbf7d0; }
+        .badge-no { background: #fecaca; }
+        .pager { margin-top: 16px; display: flex; gap: 8px; }
+        form.inline { display: inline; }
+        @media (max-width: 768px) { .layout { flex-direction: column; } .sidebar { width: 100%; } }
+    </style>
+    {% block head %}{% endblock %}
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="brand">کابانا ادمین</div>
+        <a href="/admin/" class="{% if request.url.path == '/admin/' %}active{% endif %}">داشبورد</a>
+        <a href="/admin/books" class="{% if '/admin/books' in request.url.path %}active{% endif %}">کتاب‌ها</a>
+        <a href="/admin/books?missing_pdf=1">بدون PDF</a>
+        <a href="/admin/users" class="{% if '/admin/users' in request.url.path %}active{% endif %}">کاربران</a>
+        <a href="/admin/orders" class="{% if '/admin/orders' in request.url.path %}active{% endif %}">سفارش‌ها</a>
+        <a href="/admin/reports" class="{% if '/admin/reports' in request.url.path %}active{% endif %}">گزارش‌ها</a>
+        <a href="/">بازگشت به سایت</a>
+        <a href="/auth/logout">خروج</a>
+    </aside>
+    <div class="main">
+        {% block content %}{% endblock %}
+    </div>
+</div>
+</body>
+</html>
