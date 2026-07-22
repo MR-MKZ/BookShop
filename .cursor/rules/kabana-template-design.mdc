@@ -1,0 +1,54 @@
+---
+description: Always follow the original kabana/ HTML template for storefront UI design
+alwaysApply: true
+---
+
+# Kabana Template Is the Design Source of Truth
+
+For **any** storefront UI (templates, CSS, book cards, layouts, listings), follow the original static theme in `kabana/` — do **not** invent new layouts or “improve” the design from scratch.
+
+The FastAPI app under `app/templates/` must reuse kabana’s structure and class names. Diverging from kabana caused broken grids, uneven covers, and truncated titles; matching kabana fixed it.
+
+## Before changing UI
+
+1. Open the matching page in `kabana/` (e.g. `kabana/categories.html`, `kabana/index.html`, `kabana/book-details.html`).
+2. Copy its markup pattern and CSS classes into `app/templates/`.
+3. Only then wire dynamic data (Jinja, book IDs, prices).
+
+## Book cards & listings (required)
+
+- Card markup must match kabana: `.properties.pb-30` → `.properties-card` → `.properties-img` + `.properties-caption.properties-caption2`.
+- Shared card lives in `app/templates/macros.html` (`book_card`). Prefer that macro over one-off card HTML.
+- Book grids (home, search, all books) must sit inside `.best-selling` (search/all-books: `.best-selling.p-0` like `kabana/categories.html`).
+- Use kabana-style Bootstrap columns (e.g. `col-xxl-3 col-xl-3 col-lg-4 col-md-6 col-sm-6`).
+- Do **not** apply slick-carousel margins (`.best-selling .properties { margin: 0 12px }`) to Bootstrap grid cards — those margins are for `.selling-active` only.
+
+## Covers & titles
+
+- Demo images in kabana are uniform; real covers are not. Keep equal cover boxes (`object-fit: cover`, fixed 2:3 area) without changing kabana’s card chrome.
+- Missing covers → `/static/img/book/default.jpg` (and/or media proxy default). Never point `onerror` at a non-existent path.
+- Titles: full card width (not a fixed ~150px). Prefer kabana caption styling + `1rem` title size on listings.
+
+## Do / Don’t
+
+```html
+<!-- ✅ GOOD: matches kabana/categories.html -->
+<div class="best-selling p-0">
+  <div class="row">
+    <div class="col-xxl-3 col-xl-3 col-lg-4 col-md-6 col-sm-6">
+      {{ book_card(book) }}
+    </div>
+  </div>
+</div>
+
+<!-- ❌ BAD: listing without .best-selling / custom card layout -->
+<div class="listing-area">
+  <div class="row">
+    <div class="my-custom-card">...</div>
+  </div>
+</div>
+```
+
+- **Do** reuse kabana CSS from `app/static/css/style.css` and existing theme classes.
+- **Don’t** redesign with new card systems, dashboards, or generic AI layouts when kabana already has the element.
+- **Don’t** edit `kabana/` as the live app — treat it as the reference mock; implement in `app/templates/` + `app/static/`.
