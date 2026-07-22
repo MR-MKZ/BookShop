@@ -5,12 +5,15 @@ import logging
 import os
 import random
 import re
+import socket
 import sys
 
 import aioftp
 import aiohttp
 import asyncpg
 from bs4 import BeautifulSoup
+
+from app.models import Book
 
 # --- DEFAULTS ---
 DEFAULT_BASE_URL = "https://asbook.ir"
@@ -58,7 +61,13 @@ class BookScraper:
         }
 
         self.known_urls: set[str] = set()
+        self.known_content_keys: set[str] = set()
         self.db_pool = None
+        self.run_id: int | None = None
+        self.pages_total = 0
+        self.pages_done = 0
+        self.books_saved = 0
+        self.books_skipped = 0
 
     async def init_db(self):
         """Initialize Postgres Connection Pool."""
@@ -97,9 +106,113 @@ class BookScraper:
                         updated_at TIMESTAMP WITH TIME ZONE
                     );
                 """)
+                await conn.execute("""
+                    DO $$ BEGIN
+                        CREATE TYPE scraperrunstatus AS ENUM ('RUNNING', 'COMPLETED', 'FAILED');
+                    EXCEPTION
+                        WHEN duplicate_object THEN null;
+                    END $$;
+                """)
+                await conn.execute("""
+                    CREATE TABLE IF NOT EXISTS scraper_runs (
+                        id SERIAL PRIMARY KEY,
+                        status scraperrunstatus NOT NULL DEFAULT 'RUNNING',
+                        mode VARCHAR,
+                        pages_total INTEGER DEFAULT 0,
+                        pages_done INTEGER DEFAULT 0,
+                        books_saved INTEGER DEFAULT 0,
+                        books_skipped INTEGER DEFAULT 0,
+                        error_message TEXT,
+                        pid INTEGER,
+                        hostname VARCHAR,
+                        started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                        finished_at TIMESTAMP WITH TIME ZONE,
+                        updated_at TIMESTAMP WITH TIME ZONE
+                    );
+                """)
         except Exception as e:
             logger.error(f"Failed to connect to Database: {e}")
             sys.exit(1)
+
+    def _mode_summary(self, pages_total: int) -> str:
+        parts = []
+        if self.args.update:
+            parts.append("update")
+        if self.args.turbo:
+            parts.append("turbo")
+        start = self.args.start_page
+        end = self.args.end_page or (self.args.start_page + pages_total - 1)
+        parts.append(f"pages={start}-{end}")
+        parts.append(f"workers={self.args.workers}")
+        parts.append(f"concurrency={self.args.concurrency}")
+        return " ".join(parts)
+
+    async def start_run(self, pages_total: int):
+        self.pages_total = pages_total
+        mode = self._mode_summary(pages_total)
+        async with self.db_pool.acquire() as conn:
+            self.run_id = await conn.fetchval(
+                """
+                INSERT INTO scraper_runs
+                    (status, mode, pages_total, pages_done, books_saved, books_skipped, pid, hostname)
+                VALUES ('RUNNING', $1, $2, 0, 0, 0, $3, $4)
+                RETURNING id
+                """,
+                mode,
+                pages_total,
+                os.getpid(),
+                socket.gethostname(),
+            )
+        logger.info(f"Scraper run #{self.run_id} started")
+
+    async def update_run(self):
+        if not self.run_id:
+            return
+        try:
+            async with self.db_pool.acquire() as conn:
+                await conn.execute(
+                    """
+                    UPDATE scraper_runs
+                    SET pages_done = $2,
+                        books_saved = $3,
+                        books_skipped = $4,
+                        updated_at = NOW()
+                    WHERE id = $1
+                    """,
+                    self.run_id,
+                    self.pages_done,
+                    self.books_saved,
+                    self.books_skipped,
+                )
+        except Exception as e:
+            logger.error(f"Failed to update scraper run status: {e}")
+
+    async def finish_run(self, status: str = "COMPLETED", error: str | None = None):
+        if not self.run_id:
+            return
+        try:
+            async with self.db_pool.acquire() as conn:
+                await conn.execute(
+                    """
+                    UPDATE scraper_runs
+                    SET status = $2::scraperrunstatus,
+                        pages_done = $3,
+                        books_saved = $4,
+                        books_skipped = $5,
+                        error_message = $6,
+                        finished_at = NOW(),
+                        updated_at = NOW()
+                    WHERE id = $1
+                    """,
+                    self.run_id,
+                    status,
+                    self.pages_done,
+                    self.books_saved,
+                    self.books_skipped,
+                    error,
+                )
+        except Exception as e:
+            logger.error(f"Failed to finish scraper run status: {e}")
 
     async def get_total_pages(self, session: aiohttp.ClientSession) -> int:
         """Auto-detects the last page number."""
@@ -218,7 +331,7 @@ class BookScraper:
                 await ftp_client.quit()
 
     async def check_exists(self, url: str) -> bool:
-        """Fast existence check."""
+        """Fast existence check by URL."""
         if url in self.known_urls:
             return True
 
@@ -228,6 +341,95 @@ class BookScraper:
                 self.known_urls.add(url)
                 return True
             return False
+
+    @staticmethod
+    def _normalize_text(value: str | None) -> str:
+        text = (value or "").strip().lower()
+        text = re.sub(r"[\s\u200c\u200f\u202a-\u202e]+", " ", text)
+        text = re.sub(r"[^\w\u0600-\u06ff\s]+", "", text, flags=re.UNICODE)
+        return text.strip()
+
+    def content_key(
+        self,
+        title_fa: str | None,
+        title_en: str | None,
+        author: str | None,
+        isbn: str | None,
+    ) -> str:
+        """Fingerprint for near-duplicate books (same title/ISBN across different URLs)."""
+        isbn_clean = re.sub(r"[\s\-]", "", (isbn or "").strip().lower())
+        if isbn_clean and len(isbn_clean) >= 8:
+            return f"isbn:{isbn_clean}"
+
+        title = self._normalize_text(title_en) or self._normalize_text(title_fa)
+        author_n = self._normalize_text(author)
+        if not title:
+            return ""
+        return f"ta:{title}|{author_n}"
+
+    async def load_known_content_keys(self):
+        """Preload ISBN / title fingerprints so we skip asbook duplicates."""
+        async with self.db_pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT url, title, title_en, author, isbn FROM books"
+            )
+        for row in rows:
+            if row["url"]:
+                self.known_urls.add(row["url"])
+            key = self.content_key(
+                row["title"], row["title_en"], row["author"], row["isbn"]
+            )
+            if key:
+                self.known_content_keys.add(key)
+        logger.info(
+            f"Loaded {len(self.known_urls)} URLs and {len(self.known_content_keys)} content keys"
+        )
+
+    async def is_content_duplicate(self, data: dict) -> bool:
+        key = self.content_key(
+            data.get("title_fa"),
+            data.get("title_en"),
+            data.get("author"),
+            data.get("isbn"),
+        )
+        if not key:
+            return False
+        if key in self.known_content_keys:
+            return True
+        # DB race / missed preload
+        async with self.db_pool.acquire() as conn:
+            isbn_clean = re.sub(r"[\s\-]", "", (data.get("isbn") or "").strip())
+            if isbn_clean and len(isbn_clean) >= 8:
+                exists = await conn.fetchval(
+                    """
+                    SELECT 1 FROM books
+                    WHERE REPLACE(REPLACE(LOWER(COALESCE(isbn, '')), '-', ''), ' ', '') = $1
+                    LIMIT 1
+                    """,
+                    isbn_clean.lower(),
+                )
+                if exists:
+                    self.known_content_keys.add(key)
+                    return True
+            title = self._normalize_text(data.get("title_en")) or self._normalize_text(
+                data.get("title_fa")
+            )
+            author = self._normalize_text(data.get("author"))
+            if title:
+                exists = await conn.fetchval(
+                    """
+                    SELECT 1 FROM books
+                    WHERE lower(regexp_replace(coalesce(title_en, title, ''), '\\s+', ' ', 'g')) = $1
+                      AND lower(regexp_replace(coalesce(author, ''), '\\s+', ' ', 'g')) = $2
+                    LIMIT 1
+                    """,
+                    title,
+                    author,
+                )
+                if exists:
+                    self.known_content_keys.add(key)
+                    return True
+        return False
 
     # WORKER 1: EXPLORER (Page -> Book URLs)
     async def explorer_worker(self, worker_id, session):
@@ -261,6 +463,7 @@ class BookScraper:
 
                         if await self.check_exists(href):
                             existing_count += 1
+                            self.books_skipped += 1
                             continue
 
                         meta = {"url": href}
@@ -288,6 +491,9 @@ class BookScraper:
             except Exception as e:
                 logger.error(f"Explorer-{worker_id} error: {e}")
             finally:
+                self.pages_done += 1
+                if self.pages_done % 25 == 0:
+                    await self.update_run()
                 self.page_queue.task_done()
 
     # WORKER 2: DOWNLOADER (URL -> Details)
@@ -357,11 +563,22 @@ class BookScraper:
                     description = desc_tag.text.strip() if desc_tag else ""
 
                     title = info.get("عنوان فارسی", "Unknown")
-                    folder_name = (
-                        self.sanitize_filename(title)
-                        + "_"
-                        + hashlib.md5(url.encode()).hexdigest()[:6]
-                    )
+                    title_en = info.get("عنوان اصلی", "")
+                    author = info.get("نویسنده", "")
+                    isbn = info.get("ISBN", "")
+
+                    preview = {
+                        "title_fa": title,
+                        "title_en": title_en,
+                        "author": author,
+                        "isbn": isbn,
+                    }
+                    if await self.is_content_duplicate(preview):
+                        self.books_skipped += 1
+                        logger.info(f"Skipped duplicate content: {title[:80]}")
+                        continue
+
+                    folder_name = Book.storage_folder_from_isbn_or_url(isbn, url)
 
                     cover_filename = "cover.jpg"
                     if image_url:
@@ -376,10 +593,10 @@ class BookScraper:
                     data = {
                         "url": url,
                         "title_fa": title,
-                        "title_en": info.get("عنوان اصلی", ""),
-                        "author": info.get("نویسنده", ""),
+                        "title_en": title_en,
+                        "author": author,
                         "publisher": info.get("ناشر", ""),
-                        "isbn": info.get("ISBN", ""),
+                        "isbn": isbn,
                         "year": info.get("سال نشر", ""),
                         "language": info.get("زبان", ""),
                         "pages": info.get("تعداد صفحات", ""),
@@ -396,6 +613,12 @@ class BookScraper:
                         "cover_filename": cover_filename,
                     }
 
+                    # Reserve key before queueing to reduce concurrent dupes
+                    key = self.content_key(title, title_en, author, isbn)
+                    if key:
+                        self.known_content_keys.add(key)
+                    self.known_urls.add(url)
+
                     await self.db_queue.put(data)
 
             except Exception as e:
@@ -404,12 +627,6 @@ class BookScraper:
                 )
             finally:
                 self.details_queue.task_done()
-
-    def sanitize_filename(self, name):
-        """Clean string to be used as folder name"""
-        clean = re.sub(r'[\\/*?:"<>|]', "", name)
-        clean = clean.replace(" ", "_").strip()
-        return clean
 
     # WORKER 3: DB WRITER
     async def db_writer(self):
@@ -431,6 +648,20 @@ class BookScraper:
 
     async def save_batch(self, batch):
         try:
+            # Drop content duplicates inside the batch itself
+            unique = []
+            seen_keys: set[str] = set()
+            for d in batch:
+                key = self.content_key(
+                    d.get("title_fa"), d.get("title_en"), d.get("author"), d.get("isbn")
+                )
+                if key and key in seen_keys:
+                    self.books_skipped += 1
+                    continue
+                if key:
+                    seen_keys.add(key)
+                unique.append(d)
+
             async with self.db_pool.acquire() as conn:
                 await conn.executemany(
                     """
@@ -466,50 +697,66 @@ class BookScraper:
                             d["folder_name"],
                             d.get("cover_filename", "cover.jpg"),
                         )
-                        for d in batch
+                        for d in unique
                     ],
                 )
-                logger.info(f"DB: Saved {len(batch)} books")
+                self.books_saved += len(unique)
+                logger.info(f"DB: Saved {len(unique)} books")
+                await self.update_run()
         except Exception as e:
             logger.error(f"DB Write Error: {e}")
 
     async def main(self):
         await self.init_db()
+        await self.load_known_content_keys()
+        error_msg = None
+        try:
+            conn = aiohttp.TCPConnector(limit=0)
 
-        conn = aiohttp.TCPConnector(limit=0)
+            async with aiohttp.ClientSession(connector=conn) as session:
+                start = self.args.start_page
+                end = self.args.end_page or await self.get_total_pages(session)
 
-        async with aiohttp.ClientSession(connector=conn) as session:
-            start = self.args.start_page
-            end = self.args.end_page or await self.get_total_pages(session)
+                logger.info(f"Target: Pages {start}-{end}")
+                await self.start_run(end - start + 1)
 
-            logger.info(f"Target: Pages {start}-{end}")
-            for i in range(start, end + 1):
-                self.page_queue.put_nowait(i)
+                for i in range(start, end + 1):
+                    self.page_queue.put_nowait(i)
 
-            tasks = []
-            db_task = asyncio.create_task(self.db_writer())
+                tasks = []
+                db_task = asyncio.create_task(self.db_writer())
 
-            for i in range(10):
-                tasks.append(asyncio.create_task(self.explorer_worker(i, session)))
+                for i in range(10):
+                    tasks.append(asyncio.create_task(self.explorer_worker(i, session)))
 
-            dl_tasks = []
-            for i in range(self.args.workers):
-                dl_tasks.append(asyncio.create_task(self.downloader_worker(i, session)))
+                dl_tasks = []
+                for i in range(self.args.workers):
+                    dl_tasks.append(
+                        asyncio.create_task(self.downloader_worker(i, session))
+                    )
 
-            await self.page_queue.join()
-            self.stop_discovery.set()
+                await self.page_queue.join()
+                self.stop_discovery.set()
 
-            await self.details_queue.join()
-            await asyncio.gather(*dl_tasks)
+                await self.details_queue.join()
+                await asyncio.gather(*dl_tasks)
 
-            await self.db_queue.put(None)
-            await db_task
+                await self.db_queue.put(None)
+                await db_task
 
-            for t in tasks:
-                t.cancel()
+                for t in tasks:
+                    t.cancel()
 
-        await self.db_pool.close()
-        logger.info("Scraping Completed Successfully.")
+            await self.finish_run("COMPLETED")
+            logger.info("Scraping Completed Successfully.")
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Scraping failed: {e}")
+            await self.finish_run("FAILED", error=error_msg)
+            raise
+        finally:
+            if self.db_pool:
+                await self.db_pool.close()
 
 
 if __name__ == "__main__":
