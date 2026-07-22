@@ -99,12 +99,8 @@ body {
 }
 
 html {
-    overflow: scroll;
     overflow-x: hidden;
-}
-::-webkit-scrollbar {
-    width: 0;  /* Remove scrollbar space */
-    background: transparent;  /* Optional: just make scrollbar invisible */
+    overflow-y: auto;
 }
 
 h1,
@@ -533,28 +529,28 @@ hr {
 }
 
 .footer-padding {
-    padding-top: 100px;
-    padding-bottom: 60px
+    padding-top: 40px;
+    padding-bottom: 24px
 }
 
 @media only screen and (min-width: 768px) and (max-width: 991px) {
     .footer-padding {
-        padding-top: 80px;
-        padding-bottom: 20px
+        padding-top: 36px;
+        padding-bottom: 16px
     }
 }
 
 @media only screen and (min-width: 576px) and (max-width: 767px) {
     .footer-padding {
-        padding-top: 80px;
-        padding-bottom: 20px
+        padding-top: 32px;
+        padding-bottom: 16px
     }
 }
 
 @media (max-width: 575.99px) {
     .footer-padding {
-        padding-top: 80px;
-        padding-bottom: 0px
+        padding-top: 28px;
+        padding-bottom: 12px
     }
 }
 
@@ -1851,6 +1847,11 @@ aside img,
     margin: 0 12px
 }
 
+/* Margins above are for slick carousel slides only; Bootstrap grid cards fill the column */
+.best-selling .row .properties {
+    margin: 0;
+}
+
 .best-selling .properties:first-child {
     margin-left: 0
 }
@@ -1864,8 +1865,33 @@ aside img,
     background-color: #fff
 }
 
+.properties .properties-card {
+    background-color: #fff;
+    height: 100%;
+    width: 100%;
+}
+
+.properties .properties-card .properties-img {
+    position: relative;
+    width: 100%;
+    padding-top: 150%;
+    height: auto;
+    overflow: hidden;
+    background: #f3f3f3;
+}
+
+.properties .properties-card .properties-img a {
+    position: absolute;
+    inset: 0;
+    display: block;
+}
+
+.properties .properties-card .properties-img img,
 .best-selling .properties .properties-card .properties-img img {
-    width: 100%
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
 }
 
 .best-selling .properties .properties-card .properties-caption,
@@ -2053,15 +2079,85 @@ aside img,
 
 .properties-caption h3 {
     white-space: nowrap;
-    width: 150px;
+    width: 100%;
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
-    transition: all 0.5s;
+    transition: color 0.3s;
+    margin: 0 0 6px;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.4;
 }
 
-.properties-caption h3:hover {
-    white-space: break-spaces;
-    overflow: visible;
+.properties-caption h3 a {
+    display: block;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #1a1a1a;
+    font-size: inherit;
+    font-weight: inherit;
+}
+
+.properties-caption:hover h3,
+.properties-caption:hover h3 a {
+    /* Keep truncated; expanding titles breaks card borders/heights */
+    white-space: normal;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+}
+
+.listing-area .properties .properties-card .properties-caption,
+.listing-area .properties-caption {
+    padding: 14px 16px 12px;
+    direction: rtl;
+}
+
+.listing-area .properties .properties-card .properties-caption h3 a,
+.listing-area .properties-caption h3 a {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.listing-area .properties .properties-card .properties-caption p,
+.listing-area .properties-caption p {
+    color: #9498A7;
+    font-size: 14px;
+    margin-bottom: 11px;
+}
+
+.listing-area .properties:hover .properties-card {
+    box-shadow: 0px 3px 20px rgb(188, 248, 248);
+}
+
+.listing-area .properties:hover .properties-caption h3 a {
+    color: #00a4a6;
+}
+
+.listing-area .row > [class*="col-"] {
+    display: flex;
+    align-items: flex-start;
+}
+
+.listing-area .row > [class*="col-"] > .properties {
+    width: 100%;
+}
+
+.best-selling .row.book-grid > [class*="col-"],
+.listing-area .row.book-grid > [class*="col-"] {
+    display: flex;
+}
+
+.best-selling .row.book-grid > [class*="col-"] > .properties,
+.listing-area .row.book-grid > [class*="col-"] > .properties {
+    width: 100%;
 }
 
 .selling-active button.slick-arrow {
@@ -3963,7 +4059,8 @@ aside .form-control[type="email"]:focus {
     background: #fff;
     padding: 55px 60px 50px 50px;
     box-shadow: 0px 10px 30px 0px rgba(13, 12, 13, 0.2);
-    min-width: 700px
+    min-width: 700px;
+    border-radius: 16px;
 }
 
 @media only screen and (min-width: 576px) and (max-width: 767px) {
@@ -4223,7 +4320,8 @@ aside .form-control[type="email"]:focus {
     background: #fff;
     padding: 55px 60px 50px 50px;
     box-shadow: 0px 10px 30px 0px rgba(13, 12, 13, 0.2);
-    min-width: 700px
+    min-width: 700px;
+    border-radius: 16px;
 }
 
 @media only screen and (min-width: 576px) and (max-width: 767px) {
@@ -6497,10 +6595,26 @@ del {
     margin-top: 30px;
 }
 
+.book-img {
+    flex-shrink: 0;
+    max-width: 200px;
+    width: 100%;
+}
+
+.book-img img {
+    width: 100%;
+    height: auto;
+    max-height: 300px;
+    object-fit: cover;
+    display: block;
+}
+
 .book-caption h3 {
-    font-size: 2rem;
+    font-size: 1.35rem;
     font-weight: 900;
-    margin-bottom: 30px;
+    margin-bottom: 16px;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .book-caption p a {

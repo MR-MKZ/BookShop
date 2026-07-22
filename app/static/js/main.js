@@ -1,15 +1,23 @@
 (function ($) {
   "use strict"
 
-  /* 1. sticky And Scroll UP */
-  $(window).on('scroll', function () {
+  /* 1. sticky And Scroll UP — rAF throttle to avoid scroll jank */
+  var stickyTicking = false;
+  function updateStickyHeader() {
     var scroll = $(window).scrollTop();
     if (scroll < 400) {
       $(".header-sticky").removeClass("sticky-bar");
-      $('#back-top').fadeOut(500);
+      $('#back-top').stop(true, true).fadeOut(200);
     } else {
       $(".header-sticky").addClass("sticky-bar");
-      $('#back-top').fadeIn(500);
+      $('#back-top').stop(true, true).fadeIn(200);
+    }
+    stickyTicking = false;
+  }
+  $(window).on('scroll', function () {
+    if (!stickyTicking) {
+      stickyTicking = true;
+      window.requestAnimationFrame(updateStickyHeader);
     }
   });
 
@@ -17,7 +25,7 @@
   $('#back-top a').on("click", function () {
     $('body,html').animate({
       scrollTop: 0
-    }, 800);
+    }, 400);
     return false;
   });
 
@@ -35,22 +43,49 @@
 
   /* 3. MainSlider-1 */
   // h1-hero-active
+  function doDataAnimations(elements) {
+    var animationEndEvents = 'webkitAnimationEnd mozAnimationEnd MSAnimationEnd oanimationend animationend';
+    elements.each(function () {
+      var $this = $(this);
+      var $animationDelay = $this.data('delay') || '0s';
+      var $animationType = 'animated ' + $this.data('animation');
+      $this.css({
+        'animation-delay': $animationDelay,
+        '-webkit-animation-delay': $animationDelay
+      });
+      $this.addClass($animationType).one(animationEndEvents, function () {
+        $this.removeClass($animationType);
+        $this.css({ opacity: 1, visibility: 'visible' });
+      });
+    });
+  }
+
   function mainSlider() {
     var BasicSlider = $('.slider-active');
-    BasicSlider.on('init', function (e, slick) {
-      var $firstAnimatingElements = $('.single-slider:first-child').find('[data-animation]');
-      doAnimations($firstAnimatingElements);
+    if (!BasicSlider.length || typeof BasicSlider.slick !== 'function') return;
+    if (BasicSlider.hasClass('slick-initialized')) return;
+
+    var slideCount = BasicSlider.children('.single-slider').length;
+    if (!slideCount) return;
+
+    var autoplaySpeed = parseInt(BasicSlider.attr('data-autoplay-speed'), 10);
+    if (isNaN(autoplaySpeed) || autoplaySpeed < 1000) autoplaySpeed = 10000;
+
+    BasicSlider.on('init', function () {
+      BasicSlider.addClass('is-ready');
     });
-    BasicSlider.on('beforeChange', function (e, slick, currentSlide, nextSlide) {
-      var $animatingElements = $('.single-slider[data-slick-index="' + nextSlide + '"]').find('[data-animation]');
-      doAnimations($animatingElements);
-    });
+
     BasicSlider.slick({
-      autoplay: true,
-      autoplaySpeed: 8000,
-      dots: true,
+      autoplay: slideCount > 1,
+      autoplaySpeed: autoplaySpeed,
+      dots: slideCount > 1,
       fade: true,
+      cssEase: 'linear',
+      speed: 700,
       arrows: false,
+      infinite: slideCount > 1,
+      waitForAnimate: false,
+      adaptiveHeight: false,
       prevArrow: '<button type="button" class="slick-prev"><i class="ti-angle-left"></i></button>',
       nextArrow: '<button type="button" class="slick-next"><i class="ti-angle-right"></i></button>',
       responsive: [{
@@ -58,7 +93,7 @@
           settings: {
             slidesToShow: 1,
             slidesToScroll: 1,
-            infinite: true,
+            infinite: slideCount > 1
           }
         },
         {
@@ -75,29 +110,16 @@
             slidesToShow: 1,
             slidesToScroll: 1,
             arrows: false,
-            dots: false
+            dots: slideCount > 1
           }
         }
       ]
     });
-
-    function doAnimations(elements) {
-      var animationEndEvents = 'webkitAnimationEnd mozAnimationEnd MSAnimationEnd oanimationend animationend';
-      elements.each(function () {
-        var $this = $(this);
-        var $animationDelay = $this.data('delay');
-        var $animationType = 'animated ' + $this.data('animation');
-        $this.css({
-          'animation-delay': $animationDelay,
-          '-webkit-animation-delay': $animationDelay
-        });
-        $this.addClass($animationType).one(animationEndEvents, function () {
-          $this.removeClass($animationType);
-        });
-      });
-    }
   }
   mainSlider();
+
+  // Hero search overlay animations (outside slick slides)
+  doDataAnimations($('.hero-search-overlay').find('[data-animation]'));
 
 
   // 4. selling-active
@@ -215,30 +237,43 @@
     ]
   });
 
-  /* 6. Nice Selectorp  */
-  var nice_Select = $('select');
+  /* 6. Nice Selectorp  — skip pagination page jumpers */
+  var nice_Select = $('select').not('.page-select');
   if (nice_Select.length) {
     nice_Select.niceSelect();
   }
+  /* Ensure pagination selects stay native (destroy accidental wrappers) */
+  $('select.page-select').each(function () {
+    var $sel = $(this);
+    if ($sel.next('.nice-select').length && typeof $sel.niceSelect === 'function') {
+      $sel.niceSelect('destroy');
+    }
+    $sel.css('display', '');
+  });
 
   /* 7. data-background */
   $("[data-background]").each(function () {
     $(this).css("background-image", "url(" + $(this).attr("data-background") + ")")
   });
 
-  /* 10. WOW active */
-  new WOW().init();
+  /* 10. WOW active — skip on mobile / reduce scroll cost */
+  if (typeof WOW !== 'undefined' && window.matchMedia('(min-width: 768px)').matches) {
+    new WOW({ mobile: false, live: false }).init();
+  }
 
   // 11. ---- Mailchimp js --------//  
   function mailChimp() {
-    $('#mc_embed_signup').find('form').ajaxChimp();
+    var $form = $('#mc_embed_signup').find('form');
+    if ($form.length && typeof $.fn.ajaxChimp === 'function') {
+      $form.ajaxChimp();
+    }
   }
   mailChimp();
 
 
   // 12 Pop Up Img
   var popUp = $('.single_gallery_part, .img-pop-up');
-  if (popUp.length) {
+  if (popUp.length && typeof $.fn.magnificPopup === 'function') {
     popUp.magnificPopup({
       type: 'image',
       gallery: {
@@ -248,18 +283,20 @@
   }
 
   // 13 Pop Up Video
-  var popUp = $('.popup-video');
-  if (popUp.length) {
-    popUp.magnificPopup({
+  var popUpVideo = $('.popup-video');
+  if (popUpVideo.length && typeof $.fn.magnificPopup === 'function') {
+    popUpVideo.magnificPopup({
       type: 'iframe'
     });
   }
 
   /* 14. counterUp*/
-  $('.counter').counterUp({
-    delay: 10,
-    time: 3000
-  });
+  if ($('.counter').length && typeof $.fn.counterUp === 'function') {
+    $('.counter').counterUp({
+      delay: 10,
+      time: 3000
+    });
+  }
 
 
   //15. click counter Number js
@@ -673,37 +710,40 @@ $('.publisher-books-box').slick({
   ]
 });
 
-//range price
-const slider = document.getElementById("sliderPrice");
-const rangeMin = parseInt(slider.dataset.min);
-const rangeMax = parseInt(slider.dataset.max);
-const step = parseInt(slider.dataset.step);
-const filterInputs = document.querySelectorAll("input.filter__input");
+//range price (only on pages that have the filter widget)
+(function () {
+  const slider = document.getElementById("sliderPrice");
+  if (!slider || typeof noUiSlider === "undefined") return;
 
-noUiSlider.create(slider, {
-  start: [rangeMin, rangeMax],
-  connect: true,
-  step: step,
-  direction: "rtl",
-  range: {
-    min: rangeMin,
-    max: rangeMax
-  },
+  const rangeMin = parseInt(slider.dataset.min, 10);
+  const rangeMax = parseInt(slider.dataset.max, 10);
+  const step = parseInt(slider.dataset.step, 10);
+  if (Number.isNaN(rangeMin) || Number.isNaN(rangeMax) || Number.isNaN(step)) return;
 
-  // make numbers whole
-  format: {
-    to: (value) => value,
-    from: (value) => value
-  }
-});
+  const filterInputs = document.querySelectorAll("input.filter__input");
 
-// bind inputs with noUiSlider
-slider.noUiSlider.on("update", (values, handle) => {
-  filterInputs[handle].value = values[handle];
-});
-
-filterInputs.forEach((input, indexInput) => {
-  input.addEventListener("change", () => {
-    slider.noUiSlider.setHandle(indexInput, input.value);
+  noUiSlider.create(slider, {
+    start: [rangeMin, rangeMax],
+    connect: true,
+    step: step,
+    direction: "rtl",
+    range: {
+      min: rangeMin,
+      max: rangeMax
+    },
+    format: {
+      to: (value) => value,
+      from: (value) => value
+    }
   });
-});
+
+  slider.noUiSlider.on("update", (values, handle) => {
+    if (filterInputs[handle]) filterInputs[handle].value = values[handle];
+  });
+
+  filterInputs.forEach((input, indexInput) => {
+    input.addEventListener("change", () => {
+      slider.noUiSlider.setHandle(indexInput, input.value);
+    });
+  });
+})();
