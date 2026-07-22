@@ -9,7 +9,17 @@ from sqlalchemy.orm import selectinload
 
 from app.auth import get_current_user, get_current_user_optional
 from app.database import get_async_db
-from app.models import Book, Order, OrderItem, OrderStatus, User
+from app.models import (
+    HERO_CAROUSEL_SECONDS_DEFAULT,
+    HERO_CAROUSEL_SECONDS_KEY,
+    AppSetting,
+    Book,
+    HeroSlide,
+    Order,
+    OrderItem,
+    OrderStatus,
+    User,
+)
 from app.routers.media import signer
 
 router = APIRouter()
@@ -21,6 +31,19 @@ PAGE_SIZE = 24
 def _cover_url(book: Book) -> str:
     cover = book.cover_filename or "cover.jpg"
     return f"/media/proxy/cover/{book.folder_name}/{cover}"
+
+
+def _download_token(book: Book, user_id: int) -> str:
+    return signer.dumps(
+        {
+            "folder": book.folder_name,
+            "filename": book.pdf_filename,
+            "download_name": book.download_filename,
+            "user_id": user_id,
+            "book_id": book.id,
+        },
+        salt="pdf-download",
+    )
 
 
 def _format_price(value) -> str:
@@ -50,11 +73,31 @@ async def home(
     )
     new_books = result.scalars().all()
 
+    slides_result = await db.execute(
+        select(HeroSlide)
+        .where(HeroSlide.is_active == True)  # noqa: E712
+        .order_by(HeroSlide.sort_order.asc(), HeroSlide.id.asc())
+    )
+    hero_slides = list(slides_result.scalars().all())
+
+    setting = (
+        await db.execute(
+            select(AppSetting).where(AppSetting.key == HERO_CAROUSEL_SECONDS_KEY)
+        )
+    ).scalar_one_or_none()
+    try:
+        seconds = int(setting.value) if setting else HERO_CAROUSEL_SECONDS_DEFAULT
+    except (TypeError, ValueError):
+        seconds = HERO_CAROUSEL_SECONDS_DEFAULT
+    seconds = max(3, min(seconds, 120))
+
     return templates.TemplateResponse(
         "index.html",
         {
             "request": request,
             "books": new_books,
+            "hero_slides": hero_slides,
+            "hero_interval_ms": seconds * 1000,
             "query": "",
             "current_user": current_user,
         },
@@ -146,16 +189,7 @@ async def book_detail(
     if current_user:
         owned = await _user_owns_book(db, current_user.id, book.id)
         if owned and book.has_pdf:
-            filename = book.pdf_filename
-            download_token = signer.dumps(
-                {
-                    "folder": book.folder_name,
-                    "filename": filename,
-                    "user_id": current_user.id,
-                    "book_id": book.id,
-                },
-                salt="pdf-download",
-            )
+            download_token = _download_token(book, current_user.id)
 
     return templates.TemplateResponse(
         "detail.html",
@@ -203,15 +237,7 @@ async def profile(
             seen.add(item.book_id)
             token = None
             if item.book.has_pdf:
-                token = signer.dumps(
-                    {
-                        "folder": item.book.folder_name,
-                        "filename": item.book.pdf_filename,
-                        "user_id": current_user.id,
-                        "book_id": item.book.id,
-                    },
-                    salt="pdf-download",
-                )
+                token = _download_token(item.book, current_user.id)
             library.append({"book": item.book, "token": token, "order": order})
 
     return templates.TemplateResponse(
@@ -241,14 +267,6 @@ async def download_book(
     if not await _user_owns_book(db, current_user.id, book.id):
         raise HTTPException(status_code=403, detail="ابتدا کتاب را خریداری کنید")
 
-    token = signer.dumps(
-        {
-            "folder": book.folder_name,
-            "filename": book.pdf_filename,
-            "user_id": current_user.id,
-            "book_id": book.id,
-        },
-        salt="pdf-download",
-    )
+    token = _download_token(book, current_user.id)
     url = f"/media/proxy/book/{book.folder_name}/{book.pdf_filename}?token={token}"
     return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)

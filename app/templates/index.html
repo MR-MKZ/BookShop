@@ -4,17 +4,43 @@
 {% block title %}کابانا — فروشگاه کتاب دیجیتال{% endblock %}
 
 {% block content %}
-<div class="slider-area">
-    <div class="slider-active">
-        <div class="single-slider slider-height slider-bg1 d-flex align-items-center">
-            <div class="container">
-                <div class="row">
-                    <div class="col-xxl-5 col-xl-6 col-lg-7 col-md-8">
-                        <div class="hero-caption">
-                            <h1 data-animation="fadeInUp" data-delay=".4s">کابانا</h1>
-                            <p data-animation="fadeInUp" data-delay=".6s">فروشگاه کتاب دیجیتال — جستجو کنید و فوری دانلود کنید</p>
-                            <a href="/search" class="btn hero-btn" data-animation="bounceIn" data-delay=".8s">جستجوی کتاب</a>
-                        </div>
+<div class="slider-area hero-slider-wrap">
+    <div class="slider-active dot-style" data-autoplay-speed="{{ hero_interval_ms|default(10000) }}">
+        {% if hero_slides %}
+            {% for slide in hero_slides %}
+            <div class="single-slider slider-height hero-slide" role="group" aria-label="{{ slide.title or 'کاور صفحه اصلی' }}">
+                <img class="hero-slide-image"
+                     src="{{ slide.image_url }}"
+                     alt="{{ slide.title or 'کاور صفحه اصلی' }}"
+                     loading="{% if loop.first %}eager{% else %}lazy{% endif %}">
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="single-slider slider-height slider-bg1" role="img" aria-label="کاور صفحه اصلی"></div>
+        {% endif %}
+    </div>
+
+    {# Search stays fixed over the carousel — not tied to any slide #}
+    <div class="hero-search-overlay">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-xxl-8 col-xl-9 col-lg-10 col-md-11">
+                    <div class="hero-caption hero-search-caption text-center">
+                        <h1 data-animation="fadeInUp" data-delay=".2s">کابانا</h1>
+                        <p data-animation="fadeInUp" data-delay=".4s">فروشگاه کتاب دیجیتال — جستجو کنید و فوری دانلود کنید</p>
+                        <form action="/search" method="get" class="hero-search-form" data-animation="fadeInUp" data-delay=".65s">
+                            <input type="text"
+                                   name="q"
+                                   class="auto-dir hero-search-input"
+                                   placeholder="جستجوی کتاب، نویسنده یا ناشر..."
+                                   value="{{ query|default('') }}"
+                                   autocomplete="off"
+                                   aria-label="جستجوی کتاب">
+                            <button type="submit" class="hero-search-btn" aria-label="جستجو">
+                                <i class="ti-search"></i>
+                                <span>جستجو</span>
+                            </button>
+                        </form>
                     </div>
                 </div>
             </div>
@@ -24,16 +50,20 @@
 
 <div class="best-selling section-bg" style="padding-top: 70px; padding-bottom: 70px;">
     <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-xl-7 col-lg-8">
-                <div class="section-tittle text-center mb-55">
+        <div class="row">
+            <div class="col-12">
+                <div class="section-tittle section-tittle-row mb-55">
                     <h2>جدیدترین کتاب‌ها</h2>
+                    <a href="/search" class="section-see-all">
+                        مشاهده همه کتاب‌ها
+                        <i class="fas fa-arrow-left" aria-hidden="true"></i>
+                    </a>
                 </div>
             </div>
         </div>
         <div class="row">
             {% for book in books %}
-                <div class="col-xl-3 col-lg-3 col-md-4 col-sm-6">
+                <div class="col-xxl-3 col-xl-3 col-lg-4 col-md-6 col-sm-6">
                     {{ book_card(book) }}
                 </div>
             {% else %}

@@ -1,9 +1,8 @@
 {% extends "base.html" %}
-{% from "macros.html" import dual_price %}
 
-{% block title %}پروفایل — کابانا{% endblock %}
+{% block title %}کتابخانه من — کابانا{% endblock %}
 
-{% block content %}
+{% block breadcrumb %}
 <div class="breadcrumb-items">
     <div class="row">
         <ul class="breadcrumb">
@@ -13,65 +12,78 @@
         </ul>
     </div>
 </div>
+{% endblock %}
 
-<div class="listing-area section-padding">
-    <div class="container">
-        {% if pay == 'ok' %}
-            <div class="alert alert-success">پرداخت موفق بود. کتاب به کتابخانه شما اضافه شد.</div>
-        {% elif pay == 'failed' %}
-            <div class="alert alert-danger">پرداخت ناموفق بود.</div>
-        {% elif pay == 'error' %}
-            <div class="alert alert-warning">خطا در پردازش پرداخت.</div>
-        {% endif %}
+{% block content %}
+<div class="library-page">
+    <div class="listing-area library-listing">
+        <div class="container">
+            {% if pay == 'ok' %}
+                <div class="alert alert-success">پرداخت موفق بود. کتاب به کتابخانه شما اضافه شد.</div>
+            {% elif pay == 'failed' %}
+                <div class="alert alert-danger">پرداخت ناموفق بود.</div>
+            {% elif pay == 'error' %}
+                <div class="alert alert-warning">خطا در پردازش پرداخت.</div>
+            {% endif %}
 
-        <div class="row mb-40">
-            <div class="col-xl-12">
-                <div class="section-tittle mb-20">
-                    <h2>سلام {{ current_user.display_name }}</h2>
-                </div>
-                <p>شماره موبایل: <span dir="ltr">{{ current_user.phone }}</span></p>
+            <header class="library-hero">
+                <h1 class="library-hello">سلام، {{ current_user.display_name }}</h1>
+                <p class="library-phone" dir="ltr">
+                    <i class="fas fa-mobile-alt" aria-hidden="true"></i>
+                    <span>{{ current_user.phone }}</span>
+                </p>
+            </header>
+
+            <div class="library-section-head">
+                <h2>کتاب‌های من</h2>
+                {% if library %}
+                <span class="library-count">{{ library|length }} عنوان</span>
+                {% endif %}
             </div>
-        </div>
 
-        <div class="row">
-            <div class="col-xl-12">
-                <div class="section-tittle mb-30"><h2>کتاب‌های خریداری‌شده</h2></div>
-            </div>
-        </div>
-
-        <div class="row">
-            {% for item in library %}
-            <div class="col-xl-3 col-lg-4 col-md-6">
-                <div class="properties pb-20">
-                    <div class="properties-card">
-                        <div class="properties-img">
-                            <a href="/book/{{ item.book.id }}">
-                                <img src="/media/proxy/cover/{{ item.book.folder_name }}/{{ item.book.cover_filename or 'cover.jpg' }}"
-                                     alt="{{ item.book.title }}"
-                                     onerror="this.src='{{ url_for('static', path='img/gallery/best_selling1.jpg') }}'">
-                            </a>
-                        </div>
-                        <div class="properties-caption">
-                            <h3><a href="/book/{{ item.book.id }}">{{ item.book.title }}</a></h3>
-                            <p>{{ item.book.author or '' }}</p>
-                            <div class="properties-footer">
-                                {% if item.token %}
-                                    <a href="/media/proxy/book/{{ item.book.folder_name }}/{{ item.book.pdf_filename }}?token={{ item.token }}"
-                                       class="white-btn">دانلود مجدد</a>
-                                {% else %}
-                                    <span class="border-btn">فایل به‌زودی</span>
-                                {% endif %}
+            {% if library %}
+            <div class="best-selling p-0">
+                <div class="row">
+                    {% for item in library %}
+                    <div class="col-xxl-3 col-xl-3 col-lg-4 col-md-6 col-sm-6">
+                        <div class="properties pb-30">
+                            <div class="properties-card">
+                                <div class="properties-img">
+                                    <a href="/book/{{ item.book.id }}">
+                                        <img src="/media/proxy/cover/{{ item.book.folder_name }}/{{ item.book.cover_filename or 'cover.jpg' }}"
+                                             alt="{{ item.book.title }}"
+                                             onerror="this.onerror=null;this.src='/static/img/book/default.jpg'"
+                                             loading="lazy">
+                                    </a>
+                                </div>
+                                <div class="properties-caption properties-caption2">
+                                    <h3><a href="/book/{{ item.book.id }}" title="{{ item.book.title or '' }}">{{ item.book.title or 'بدون عنوان' }}</a></h3>
+                                    <p>{{ item.book.author or 'نویسنده نامشخص' }}</p>
+                                    <div class="properties-footer">
+                                        {% if item.token %}
+                                            <a href="/media/proxy/book/{{ item.book.folder_name }}/{{ item.book.pdf_filename }}?token={{ item.token }}"
+                                               class="library-download-btn">دانلود کتاب</a>
+                                        {% else %}
+                                            <span class="library-download-btn is-disabled">فایل به‌زودی</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
+                    {% endfor %}
                 </div>
             </div>
             {% else %}
-            <div class="col-12 text-center py-5">
-                <p>هنوز کتابی خریداری نکرده‌اید.</p>
-                <a href="/search?q= " class="btn">جستجوی کتاب</a>
+            <div class="library-empty">
+                <div class="library-empty-icon" aria-hidden="true">
+                    <i class="fas fa-book-open"></i>
+                </div>
+                <h3>کتابخانه‌تان خالی است</h3>
+                <p>هنوز کتابی خریداری نکرده‌اید. از فروشگاه شروع کنید و اولین عنوان را به کتابخانه اضافه کنید.</p>
+                <a href="/search" class="btn">مشاهده کتاب‌ها</a>
             </div>
-            {% endfor %}
+            {% endif %}
         </div>
     </div>
 </div>

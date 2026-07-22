@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros.html" import book_card %}
+{% from "macros.html" import book_card, page_pagination %}
 
 {% block title %}جستجو{% if query %}: {{ query }}{% endif %} — کابانا{% endblock %}
 
@@ -26,36 +26,29 @@
         <div class="row">
             <div class="col-xl-12 mb-30">
                 <form action="/search" method="get" class="form-box" style="max-width: 520px;">
-                    <input type="text" name="q" placeholder="جستجوی کتاب..." value="{{ query }}">
+                    <input type="text" name="q" class="auto-dir" placeholder="جستجوی کتاب..." value="{{ query }}">
                     <div class="search-icon">
                         <button type="submit" style="border:0;background:transparent;cursor:pointer;"><i class="ti-search"></i></button>
                     </div>
                 </form>
             </div>
         </div>
-        <div class="row">
-            {% for book in books %}
-                <div class="col-xl-3 col-lg-3 col-md-4 col-sm-6">
-                    {{ book_card(book) }}
-                </div>
-            {% else %}
-                <div class="col-12 text-center py-5">
-                    <p>نتیجه‌ای یافت نشد.</p>
-                </div>
-            {% endfor %}
+        {# Original kabana/categories.html wraps the grid in .best-selling #}
+        <div class="best-selling p-0">
+            <div class="row">
+                {% for book in books %}
+                    <div class="col-xxl-3 col-xl-3 col-lg-4 col-md-6 col-sm-6">
+                        {{ book_card(book) }}
+                    </div>
+                {% else %}
+                    <div class="col-12 text-center py-5">
+                        <p>نتیجه‌ای یافت نشد.</p>
+                    </div>
+                {% endfor %}
+            </div>
         </div>
 
-        {% if total_pages and total_pages > 1 %}
-        <div class="pagination-kabana">
-            {% if page > 1 %}
-                <a href="/search?q={{ query|urlencode }}&page={{ page - 1 }}">قبلی</a>
-            {% endif %}
-            <span class="active">{{ page }} / {{ total_pages }}</span>
-            {% if page < total_pages %}
-                <a href="/search?q={{ query|urlencode }}&page={{ page + 1 }}">بعدی</a>
-            {% endif %}
-        </div>
-        {% endif %}
+        {{ page_pagination(page, total_pages, '/search?q=' ~ (query|urlencode)) }}
     </div>
 </div>
 {% endblock %}

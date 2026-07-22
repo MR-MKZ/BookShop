@@ -12,23 +12,51 @@
 {%- endmacro %}
 
 {% macro book_card(book) -%}
-<div class="properties pb-20">
+{# Match kabana/categories.html card structure #}
+<div class="properties pb-30">
     <div class="properties-card">
         <div class="properties-img">
             <a href="/book/{{ book.id }}">
                 <img src="/media/proxy/cover/{{ book.folder_name }}/{{ book.cover_filename or 'cover.jpg' }}"
                      alt="{{ book.title }}"
-                     onerror="this.src='{{ url_for('static', path='img/gallery/best_selling1.jpg') }}'"
+                     onerror="this.onerror=null;this.src='/static/img/book/default.jpg'"
                      loading="lazy">
             </a>
         </div>
-        <div class="properties-caption">
-            <h3><a href="/book/{{ book.id }}">{{ book.title or 'بدون عنوان' }}</a></h3>
+        <div class="properties-caption properties-caption2">
+            <h3><a href="/book/{{ book.id }}" title="{{ book.title or 'بدون عنوان' }}">{{ book.title or 'بدون عنوان' }}</a></h3>
             <p>{{ book.author or 'نویسنده نامشخص' }}</p>
-            <div class="properties-footer">
+            <div class="properties-footer d-flex justify-content-between align-items-center">
                 {{ dual_price(book) }}
             </div>
         </div>
     </div>
 </div>
+{%- endmacro %}
+
+{% macro page_pagination(page, total_pages, base_url, variant='store') -%}
+{# base_url: path with existing query params, without page=  e.g. "/search?q=foo" #}
+{# Storefront avoids kabana .btn (huge padding). Admin keeps its own .btn styles. #}
+{% if total_pages and total_pages > 1 %}
+{% set sep = '&' if '?' in base_url else '?' %}
+{% set nav_cls = 'btn btn-secondary page-nav-btn' if variant == 'admin' else 'page-nav-btn' %}
+<div class="pager page-pagination{% if variant != 'admin' %} page-pagination-store{% endif %}">
+    {% if page > 1 %}
+        <a class="{{ nav_cls }}" href="{{ base_url }}{{ sep }}page={{ page - 1 }}">قبلی</a>
+    {% endif %}
+    <label class="page-select-label">
+        صفحه
+        <select class="page-select" aria-label="انتخاب صفحه"
+                onchange="if (this.value) window.location.href = this.value;">
+            {% for p in range(1, total_pages + 1) %}
+            <option value="{{ base_url }}{{ sep }}page={{ p }}" {% if p == page %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+        </select>
+        از {{ total_pages }}
+    </label>
+    {% if page < total_pages %}
+        <a class="{{ nav_cls }}" href="{{ base_url }}{{ sep }}page={{ page + 1 }}">بعدی</a>
+    {% endif %}
+</div>
+{% endif %}
 {%- endmacro %}
