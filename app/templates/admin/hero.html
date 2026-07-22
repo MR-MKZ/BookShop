@@ -1,0 +1,128 @@
+{% extends "admin/base.html" %}
+{% block title %}کاور صفحه اصلی{% endblock %}
+{% block content %}
+<h1>کاور لندینگ صفحه اصلی</h1>
+
+{% if message == 'uploaded' %}
+<div class="msg">کاور با موفقیت افزوده شد.</div>
+{% elif message == 'saved' %}
+<div class="msg">تغییرات ذخیره شد.</div>
+{% elif message == 'deleted' %}
+<div class="msg">کاور حذف شد.</div>
+{% elif message == 'settings_saved' %}
+<div class="msg">تنظیمات کاروسل ذخیره شد.</div>
+{% endif %}
+{% if error == 'bad_ext' %}
+<div class="msg" style="background:#fecaca;color:#991b1b;">فرمت تصویر مجاز نیست (jpg / png / webp).</div>
+{% elif error == 'empty' %}
+<div class="msg" style="background:#fecaca;color:#991b1b;">فایل خالی است.</div>
+{% endif %}
+
+<div class="card" style="margin-bottom:20px;border-right:4px solid #50b848;">
+    <strong>اندازه پیشنهادی تصویر:</strong>
+    <span dir="ltr">{{ recommended_size }}</span> پیکسل
+    <span style="color:#64748b;">(حداقل <span dir="ltr">{{ min_size }}</span>)</span>
+    <p style="margin:8px 0 0;color:#64748b;font-size:.9rem;">
+        تصویر به‌صورت تمام‌عرض روی کاور لندینگ نمایش داده می‌شود (ارتفاع نمایش حدود ۵۸۰px).
+        نسبت نزدیک به <span dir="ltr">2.7:1</span> بهترین نتیجه را می‌دهد. فرمت: JPG / PNG / WebP.
+    </p>
+</div>
+
+<div class="card" style="margin-bottom:24px;">
+    <h2 style="margin-top:0;font-size:1.1rem;">زمان تعویض کاروسل</h2>
+    <p style="color:#64748b;font-size:.9rem;margin-top:0;">اگر بیش از یک کاور فعال باشد، اسلایدها با این فاصله عوض می‌شوند. پیش‌فرض: ۱۰ ثانیه.</p>
+    <form method="post" action="/admin/hero/settings" class="filters" style="align-items:flex-end;">
+        <label>
+            فاصله تعویض (ثانیه)
+            <br>
+            <input type="number" name="interval_seconds" value="{{ interval_seconds }}" min="3" max="120" dir="ltr" style="width:120px;flex:0 0 auto;">
+        </label>
+        <button class="btn" type="submit">ذخیره زمان</button>
+    </form>
+</div>
+
+<div class="card admin-form" style="margin-bottom:24px;max-width:640px;">
+    <h2 style="margin-top:0;font-size:1.1rem;">افزودن کاور جدید</h2>
+    <form method="post" action="/admin/hero/upload" enctype="multipart/form-data">
+        <div class="form-grid">
+            <div class="form-field full">
+                <label for="hero_image">تصویر کاور *</label>
+                <input id="hero_image" type="file" name="image" accept=".{{ allowed_exts|join(',.') }}" required>
+            </div>
+            <div class="form-field full">
+                <label for="hero_title">عنوان روی کاور (اختیاری)</label>
+                <input id="hero_title" name="title" placeholder="کابانا">
+            </div>
+            <div class="form-field">
+                <label for="hero_sort">ترتیب نمایش</label>
+                <input id="hero_sort" type="number" name="sort_order" value="{{ slides|length }}" dir="ltr">
+            </div>
+            <div class="form-field">
+                <label for="hero_interval">فاصله کاروسل (ثانیه)</label>
+                <input id="hero_interval" type="number" name="interval_seconds" value="{{ interval_seconds }}" min="3" max="120" dir="ltr">
+            </div>
+            <div class="form-field full">
+                <label class="form-check">
+                    <input type="checkbox" name="is_active" checked>
+                    فعال
+                </label>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn" type="submit">آپلود کاور</button>
+        </div>
+    </form>
+</div>
+
+<h2>کاورهای فعلی</h2>
+{% if slides %}
+<table>
+    <thead>
+        <tr>
+            <th>پیش‌نمایش</th>
+            <th>عنوان</th>
+            <th>ترتیب</th>
+            <th>وضعیت</th>
+            <th>ویرایش</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for slide in slides %}
+        <tr>
+            <td>
+                <img src="{{ slide.image_url }}" alt="" style="width:160px;height:60px;object-fit:cover;border-radius:6px;background:#e2e8f0;">
+            </td>
+            <td>{{ slide.title or '—' }}</td>
+            <td dir="ltr">{{ slide.sort_order }}</td>
+            <td>
+                {% if slide.is_active %}<span class="badge badge-ok">فعال</span>
+                {% else %}<span class="badge badge-muted">غیرفعال</span>{% endif %}
+            </td>
+            <td style="min-width:280px;">
+                <form method="post" action="/admin/hero/{{ slide.id }}/edit" enctype="multipart/form-data" style="margin-bottom:8px;">
+                    <p style="margin:0 0 6px;">
+                        <input name="title" value="{{ slide.title or '' }}" placeholder="عنوان" style="width:100%;">
+                    </p>
+                    <p style="margin:0 0 6px;display:flex;gap:8px;flex-wrap:wrap;">
+                        <input type="number" name="sort_order" value="{{ slide.sort_order }}" dir="ltr" style="width:80px;flex:0 0 auto;" title="ترتیب">
+                        <input type="number" name="interval_seconds" value="{{ interval_seconds }}" min="3" max="120" dir="ltr" style="width:90px;flex:0 0 auto;" title="ثانیه کاروسل">
+                    </p>
+                    <p style="margin:0 0 6px;">
+                        <input type="file" name="image" accept=".{{ allowed_exts|join(',.') }}">
+                    </p>
+                    <p style="margin:0 0 8px;"><label class="form-check"><input type="checkbox" name="is_active" {% if slide.is_active %}checked{% endif %}> فعال</label></p>
+                    <div class="btn-row btn-row-sm">
+                        <button class="btn btn-sm" type="submit">ذخیره</button>
+                        <button class="btn btn-sm btn-danger" type="submit" form="hero-delete-{{ slide.id }}" onclick="return confirm('حذف این کاور؟');">حذف</button>
+                    </div>
+                </form>
+                <form id="hero-delete-{{ slide.id }}" method="post" action="/admin/hero/{{ slide.id }}/delete" hidden></form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="msg" style="background:#f1f5f9;color:#475569;">هنوز کاوری ثبت نشده — از تصویر پیش‌فرض تم استفاده می‌شود.</div>
+{% endif %}
+{% endblock %}

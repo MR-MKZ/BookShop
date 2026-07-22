@@ -1,0 +1,93 @@
+{% extends "admin/base.html" %}
+{% block title %}ویرایش کاربر{% endblock %}
+{% block content %}
+<h1>ویرایش کاربر #{{ user.id }}</h1>
+{% if message %}<div class="msg">عملیات با موفقیت انجام شد ({{ message }})</div>{% endif %}
+{% if error %}<div class="msg" style="background:#fecaca;color:#991b1b;">{{ error }}</div>{% endif %}
+
+<form class="admin-form" method="post" action="/admin/users/{{ user.id }}" style="max-width:720px;">
+    <div class="form-grid">
+        <div class="form-field">
+            <label for="first_name">نام</label>
+            <input id="first_name" name="first_name" value="{{ user.first_name or '' }}">
+        </div>
+        <div class="form-field">
+            <label for="last_name">نام خانوادگی</label>
+            <input id="last_name" name="last_name" value="{{ user.last_name or '' }}">
+        </div>
+        <div class="form-field">
+            <label for="phone">موبایل</label>
+            <input id="phone" name="phone" value="{{ user.phone or '' }}" dir="ltr" required>
+        </div>
+        <div class="form-field">
+            <label for="email">ایمیل</label>
+            <input id="email" name="email" type="email" value="{{ user.email or '' }}" dir="ltr">
+        </div>
+        <div class="form-field">
+            <label for="username">نام کاربری</label>
+            <input id="username" name="username" value="{{ user.username or '' }}" dir="ltr">
+        </div>
+        <div class="form-field">
+            <label for="password">رمز عبور جدید (اختیاری)</label>
+            <input id="password" name="password" type="password" placeholder="خالی = بدون تغییر" dir="ltr">
+        </div>
+        <div class="form-field">
+            <label for="role">نقش</label>
+            <select id="role" name="role">
+                {% for r in roles %}
+                <option value="{{ r }}" {% if user.role.value == r %}selected{% endif %}>{{ r }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-field">
+            <label class="form-check" style="margin-top:28px;">
+                <input type="checkbox" name="is_active" {% if user.is_active %}checked{% endif %}>
+                فعال
+            </label>
+        </div>
+    </div>
+    <div class="form-actions">
+        <button class="btn" type="submit">ذخیره</button>
+        <a class="btn btn-secondary" href="/admin/users">بازگشت</a>
+    </div>
+</form>
+
+<hr>
+<h2>کتابخانه کاربر ({{ library|length }})</h2>
+<form class="admin-form" method="post" action="/admin/users/{{ user.id }}/books" style="margin-bottom:16px;">
+    <div class="form-grid">
+        <div class="form-field full">
+            <label for="book_ids">افزودن کتاب با شناسه</label>
+            <textarea id="book_ids" name="book_ids" rows="3" dir="ltr" placeholder="12, 45, 78"></textarea>
+            <p class="form-hint">چندتایی با کاما یا خط جدید</p>
+        </div>
+    </div>
+    <div class="form-actions">
+        <button class="btn" type="submit">افزودن به پروفایل</button>
+    </div>
+</form>
+
+<table>
+    <thead>
+        <tr><th>شناسه</th><th>عنوان</th><th>نویسنده</th><th>فایل</th><th></th></tr>
+    </thead>
+    <tbody>
+        {% for book in library %}
+        <tr>
+            <td>{{ book.id }}</td>
+            <td><a href="/admin/books/{{ book.id }}">{{ book.title }}</a></td>
+            <td>{{ book.author or '—' }}</td>
+            <td>{% if book.has_pdf %}<span class="badge badge-ok">{{ book.file_format or 'pdf' }}</span>{% else %}<span class="badge badge-no">ندارد</span>{% endif %}</td>
+            <td>
+                <form class="inline" method="post" action="/admin/users/{{ user.id }}/books/remove" onsubmit="return confirm('حذف از کتابخانه؟');">
+                    <input type="hidden" name="book_id" value="{{ book.id }}">
+                    <button class="btn btn-sm btn-danger" type="submit">حذف</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5">کتابی در کتابخانه نیست</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

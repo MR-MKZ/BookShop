@@ -1,0 +1,72 @@
+{% extends "admin/base.html" %}
+{% block title %}وضعیت اسکرپر{% endblock %}
+{% block head %}
+<meta http-equiv="refresh" content="10">
+{% endblock %}
+{% block content %}
+<h1>وضعیت اسکرپر</h1>
+<p style="color:#64748b;">این صفحه هر ۱۰ ثانیه به‌روز می‌شود. اجرا با <code dir="ltr">docker compose --profile scraper up --build scraper</code></p>
+
+{% if running %}
+<div class="card" style="margin-bottom:20px;border-right:4px solid #50b848;">
+    <h2 style="margin:0 0 8px;">در حال اجرا #{{ running.id }}</h2>
+    <p>شروع: <span dir="ltr">{{ running.started_at }}</span></p>
+    <p>حالت: {{ running.mode or '—' }}</p>
+    <p>صفحات: {{ running.pages_done or 0 }} / {{ running.pages_total or '?' }}</p>
+    <p>ذخیره‌شده: {{ running.books_saved or 0 }} — ردشده: {{ running.books_skipped or 0 }}</p>
+    {% if running.hostname %}<p>میزبان: <span dir="ltr">{{ running.hostname }}</span> (pid {{ running.pid }})</p>{% endif %}
+</div>
+{% elif latest %}
+<div class="card" style="margin-bottom:20px;">
+    <h2 style="margin:0 0 8px;">آخرین اجرا #{{ latest.id }}
+        {% if latest.status.value == 'COMPLETED' %}<span class="badge badge-ok">موفق</span>
+        {% elif latest.status.value == 'FAILED' %}<span class="badge badge-no">ناموفق</span>
+        {% else %}<span class="badge">{{ latest.status.value }}</span>{% endif %}
+    </h2>
+    <p>شروع: <span dir="ltr">{{ latest.started_at }}</span>
+       {% if latest.finished_at %} — پایان: <span dir="ltr">{{ latest.finished_at }}</span>{% endif %}</p>
+    <p>حالت: {{ latest.mode or '—' }}</p>
+    <p>صفحات: {{ latest.pages_done or 0 }} / {{ latest.pages_total or '?' }}</p>
+    <p>ذخیره‌شده: {{ latest.books_saved or 0 }} — ردشده: {{ latest.books_skipped or 0 }}</p>
+    {% if latest.error_message %}<p style="color:#dc2626;">خطا: {{ latest.error_message }}</p>{% endif %}
+</div>
+{% else %}
+<div class="msg" style="background:#f1f5f9;color:#475569;">هنوز اجرایی ثبت نشده است.</div>
+{% endif %}
+
+<h2>تاریخچه</h2>
+<table>
+    <thead>
+        <tr>
+            <th>شناسه</th>
+            <th>وضعیت</th>
+            <th>حالت</th>
+            <th>صفحات</th>
+            <th>ذخیره</th>
+            <th>رد</th>
+            <th>شروع</th>
+            <th>پایان</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for run in runs %}
+        <tr>
+            <td>{{ run.id }}</td>
+            <td>
+                {% if run.status.value == 'RUNNING' %}<span class="badge" style="background:#bfdbfe;">RUNNING</span>
+                {% elif run.status.value == 'COMPLETED' %}<span class="badge badge-ok">COMPLETED</span>
+                {% else %}<span class="badge badge-no">FAILED</span>{% endif %}
+            </td>
+            <td>{{ run.mode or '—' }}</td>
+            <td dir="ltr">{{ run.pages_done or 0 }}/{{ run.pages_total or '?' }}</td>
+            <td>{{ run.books_saved or 0 }}</td>
+            <td>{{ run.books_skipped or 0 }}</td>
+            <td dir="ltr">{{ run.started_at }}</td>
+            <td dir="ltr">{{ run.finished_at or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="8">موردی نیست</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

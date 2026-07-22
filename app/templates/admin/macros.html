@@ -1,0 +1,159 @@
+{# Shared admin chart range filter + Chart.js helpers #}
+{% macro date_range_filter(action_url, range_key, date_from, date_to, range_presets) -%}
+<div class="chart-range">
+    <div class="range-presets" role="group" aria-label="بازه زمانی">
+        {% for p in range_presets %}
+        <a class="range-chip{% if range_key == p.key %} active{% endif %}"
+           href="{{ action_url }}?range={{ p.key }}">{{ p.label }}</a>
+        {% endfor %}
+    </div>
+    <form class="filters range-custom" method="get" action="{{ action_url }}">
+        <input type="hidden" name="range" value="custom">
+        <label>از <input type="date" name="date_from" value="{{ date_from }}" required></label>
+        <label>تا <input type="date" name="date_to" value="{{ date_to }}" required></label>
+        <button class="btn" type="submit">اعمال بازه سفارشی</button>
+    </form>
+</div>
+{%- endmacro %}
+
+{% macro sales_books_charts(sales_chart, top_books_chart, sales_canvas_id='salesChart', books_canvas_id='topBooksChart') -%}
+<div class="charts-grid">
+    <div class="chart-card">
+        <h2>فروش (مبلغ)</h2>
+        <div class="chart-wrap">
+            <canvas id="{{ sales_canvas_id }}"></canvas>
+        </div>
+    </div>
+    <div class="chart-card">
+        <h2>۱۰ کتاب پرفروش</h2>
+        <div class="chart-wrap chart-wrap-bar">
+            <canvas id="{{ books_canvas_id }}"></canvas>
+        </div>
+    </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    var salesData = {{ sales_chart | tojson }};
+    var booksData = {{ top_books_chart | tojson }};
+    var faNum = function (n) {
+        try { return Number(n || 0).toLocaleString('fa-IR'); }
+        catch (e) { return String(n); }
+    };
+    var grid = 'rgba(148, 163, 184, 0.25)';
+    var text = '#64748b';
+
+    var salesEl = document.getElementById('{{ sales_canvas_id }}');
+    if (salesEl && window.Chart) {
+        new Chart(salesEl, {
+            type: 'line',
+            data: {
+                labels: salesData.labels || [],
+                datasets: [{
+                    label: 'مبلغ فروش (تومان)',
+                    data: salesData.sales || [],
+                    borderColor: '#50b848',
+                    backgroundColor: 'rgba(80, 184, 72, 0.15)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 3,
+                    pointHoverRadius: 5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: true, labels: { color: text } },
+                    tooltip: {
+                        callbacks: {
+                            label: function (ctx) {
+                                return ' فروش: ' + faNum(ctx.parsed.y) + ' تومان';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: { color: text, maxRotation: 45, minRotation: 0, autoSkip: true, maxTicksLimit: 12 },
+                        grid: { color: grid }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: text,
+                            callback: function (v) { return faNum(v); }
+                        },
+                        grid: { color: grid }
+                    }
+                }
+            }
+        });
+    }
+
+    var booksEl = document.getElementById('{{ books_canvas_id }}');
+    if (booksEl && window.Chart) {
+        new Chart(booksEl, {
+            type: 'bar',
+            data: {
+                labels: booksData.labels || [],
+                datasets: [{
+                    label: 'تعداد فروش',
+                    data: booksData.sold || [],
+                    backgroundColor: 'rgba(14, 165, 233, 0.75)',
+                    borderColor: '#0284c7',
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    maxBarThickness: 42
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: function (items) {
+                                var i = items[0] && items[0].dataIndex;
+                                var full = (booksData.books || [])[i];
+                                return full && full.title ? full.title : (items[0] && items[0].label) || '';
+                            },
+                            afterLabel: function (ctx) {
+                                var rev = (booksData.revenue || [])[ctx.dataIndex] || 0;
+                                return 'درآمد: ' + faNum(rev) + ' تومان';
+                            },
+                            label: function (ctx) {
+                                return ' تعداد: ' + faNum(ctx.parsed.y);
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: text,
+                            maxRotation: 50,
+                            minRotation: 35,
+                            autoSkip: false,
+                            font: { size: 11 }
+                        },
+                        grid: { display: false }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            color: text,
+                            precision: 0,
+                            callback: function (v) { return faNum(v); }
+                        },
+                        grid: { color: grid }
+                    }
+                }
+            }
+        });
+    }
+})();
+</script>
+{%- endmacro %}

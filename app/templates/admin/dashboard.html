@@ -1,4 +1,5 @@
 {% extends "admin/base.html" %}
+{% from "admin/macros.html" import date_range_filter, sales_books_charts %}
 {% block title %}داشبورد{% endblock %}
 {% block content %}
 <h1>داشبورد</h1>
@@ -8,9 +9,53 @@
     <div class="card"><div class="num">{{ "{:,.0f}".format(stats.sales_month|float) }}</div><div class="label">فروش این ماه</div></div>
     <div class="card"><div class="num">{{ stats.orders }}</div><div class="label">سفارش‌های موفق</div></div>
     <div class="card"><div class="num">{{ stats.books }}</div><div class="label">کل کتاب‌ها</div></div>
-    <div class="card"><div class="num">{{ stats.missing_pdf }}</div><div class="label">بدون PDF</div></div>
+    <div class="card"><div class="num">{{ stats.missing_pdf }}</div><div class="label">بدون فایل</div></div>
     <div class="card"><div class="num">{{ stats.users }}</div><div class="label">کاربران</div></div>
 </div>
-<p><a class="btn" href="/admin/books?missing_pdf=1">آپلود PDFهای مفقود</a>
-<a class="btn btn-secondary" href="/admin/reports">گزارش فروش</a></p>
+{% if latest_scraper %}
+<div class="card" style="margin-bottom:20px;">
+    <div class="label">آخرین اسکرپر</div>
+    <p style="margin:8px 0 0;">
+        #{{ latest_scraper.id }} —
+        {% if latest_scraper.status.value == 'RUNNING' %}<span class="badge" style="background:#bfdbfe;">RUNNING</span>
+        {% elif latest_scraper.status.value == 'COMPLETED' %}<span class="badge badge-ok">COMPLETED</span>
+        {% else %}<span class="badge badge-no">FAILED</span>{% endif %}
+        — صفحات {{ latest_scraper.pages_done or 0 }}/{{ latest_scraper.pages_total or '?' }}
+        — ذخیره {{ latest_scraper.books_saved or 0 }}
+    </p>
+</div>
+{% endif %}
+<p>
+    <a class="btn" href="/admin/books?missing_pdf=1">آپلود فایل‌های مفقود</a>
+    <a class="btn" href="/admin/books/new">افزودن کتاب</a>
+    <a class="btn btn-secondary" href="/admin/scraper">وضعیت اسکرپر</a>
+    <a class="btn btn-secondary" href="/admin/reports">گزارش فروش</a>
+</p>
+
+<section class="chart-section">
+    <h2>نمودارها</h2>
+    {{ date_range_filter('/admin/', range_key, date_from, date_to, range_presets) }}
+    <div class="cards" style="margin-top:12px;">
+        <div class="card"><div class="num">{{ "{:,.0f}".format(range_total_sales|float) }}</div><div class="label">فروش بازه انتخابی</div></div>
+        <div class="card"><div class="num">{{ range_total_orders }}</div><div class="label">سفارش موفق در بازه</div></div>
+    </div>
+    {{ sales_books_charts(sales_chart, top_books_chart) }}
+
+    {% if top_books %}
+    <h2 style="margin-top:8px;">۱۰ کتاب پرفروش</h2>
+    <table>
+        <thead><tr><th>#</th><th>عنوان</th><th>تعداد</th><th>درآمد</th></tr></thead>
+        <tbody>
+            {% for b in top_books %}
+            <tr>
+                <td>{{ b.id }}</td>
+                <td><a href="/admin/books/{{ b.id }}">{{ b.title }}</a></td>
+                <td>{{ b.sold }}</td>
+                <td dir="ltr">{{ "{:,.0f}".format(b.revenue) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</section>
 {% endblock %}

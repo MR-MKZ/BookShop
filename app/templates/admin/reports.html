@@ -1,17 +1,16 @@
 {% extends "admin/base.html" %}
+{% from "admin/macros.html" import date_range_filter, sales_books_charts %}
 {% block title %}گزارش‌ها{% endblock %}
 {% block content %}
 <h1>گزارش فروش</h1>
-<form class="filters" method="get">
-    <label>از <input type="date" name="date_from" value="{{ date_from }}"></label>
-    <label>تا <input type="date" name="date_to" value="{{ date_to }}"></label>
-    <button class="btn" type="submit">اعمال بازه</button>
-</form>
+{{ date_range_filter('/admin/reports', range_key, date_from, date_to, range_presets) }}
 
 <div class="cards">
     <div class="card"><div class="num">{{ "{:,.0f}".format(total_sales|float) }}</div><div class="label">مجموع فروش (تومان)</div></div>
     <div class="card"><div class="num">{{ order_count }}</div><div class="label">تعداد سفارش موفق</div></div>
 </div>
+
+{{ sales_books_charts(sales_chart, top_books_chart, 'reportsSalesChart', 'reportsTopBooksChart') }}
 
 <h2>خلاصه ماهانه</h2>
 <table>
@@ -19,7 +18,7 @@
     <tbody>
         {% for row in monthly_rows %}
         <tr>
-            <td>{{ row[0] }}</td>
+            <td>{{ row[0]|jalali(false) if row[0] else '—' }}</td>
             <td>{{ row[1] }}</td>
             <td dir="ltr">{{ "{:,.0f}".format(row[2]|float) }}</td>
         </tr>
@@ -29,7 +28,7 @@
     </tbody>
 </table>
 
-<h2 style="margin-top:32px;">فروش هر کتاب</h2>
+<h2 style="margin-top:32px;">۱۰ کتاب پرفروش</h2>
 <table>
     <thead><tr><th>شناسه</th><th>عنوان</th><th>تعداد فروش</th><th>درآمد</th></tr></thead>
     <tbody>

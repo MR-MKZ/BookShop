@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}پنل ادمین{% endblock %} — کابانا</title>
     <style>
-        :root { --bg: #f4f6f8; --side: #1e293b; --accent: #50b848; --text: #1e293b; }
+        :root { --bg: #f4f6f8; --side: #1e293b; --accent: #50b848; --text: #1e293b; --mobile-bar: 52px; }
         * { box-sizing: border-box; }
         body { margin: 0; font-family: Tahoma, 'IRANSans', sans-serif; background: var(--bg); color: var(--text); direction: rtl; }
         .layout { display: flex; min-height: 100vh; }
@@ -13,47 +13,414 @@
         .sidebar a { display: block; color: #cbd5e1; text-decoration: none; padding: 12px 20px; }
         .sidebar a:hover, .sidebar a.active { background: #334155; color: #fff; }
         .sidebar .brand { padding: 0 20px 20px; font-weight: bold; font-size: 1.1rem; border-bottom: 1px solid #334155; margin-bottom: 10px; }
-        .main { flex: 1; padding: 24px; overflow-x: auto; }
-        h1, h2 { margin-top: 0; }
-        .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .sidebar-nav { display: flex; flex-direction: column; }
+        .main { flex: 1; padding: 24px; overflow-x: auto; min-width: 0; }
+        h1, h2 { margin-top: 0; font-size: 1.5rem; }
+        .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 16px; margin-bottom: 24px; }
         .card { background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
         .card .num { font-size: 1.5rem; font-weight: bold; color: var(--accent); }
         .card .label { color: #64748b; font-size: .85rem; margin-top: 4px; }
-        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; }
+        .table-wrap { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; min-width: 640px; }
         th, td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; text-align: right; font-size: .9rem; }
         th { background: #f8fafc; }
-        .btn { display: inline-block; padding: 8px 14px; background: var(--accent); color: #fff; border: 0; border-radius: 6px; text-decoration: none; cursor: pointer; font-size: .85rem; }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            min-height: 38px;
+            padding: 8px 16px;
+            background: var(--accent);
+            color: #fff;
+            border: 0;
+            border-radius: 8px;
+            text-decoration: none;
+            cursor: pointer;
+            font-size: .875rem;
+            font-family: inherit;
+            font-weight: 600;
+            line-height: 1.2;
+            box-sizing: border-box;
+            white-space: nowrap;
+            transition: background .15s ease, box-shadow .15s ease, opacity .15s ease;
+        }
+        .btn:hover { filter: brightness(0.96); }
+        .btn:active { transform: translateY(1px); }
         .btn-secondary { background: #64748b; }
         .btn-danger { background: #dc2626; }
-        .btn-sm { padding: 4px 10px; }
+        .btn-sm {
+            min-height: 32px;
+            padding: 5px 12px;
+            font-size: .8rem;
+            border-radius: 7px;
+        }
+        .btn-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+        .btn-row > .btn,
+        .btn-row > a.btn,
+        .btn-row > button.btn,
+        .btn-row form .btn {
+            min-height: 38px;
+            padding: 8px 16px;
+            font-size: .875rem;
+        }
+        .btn-row.btn-row-sm > .btn,
+        .btn-row.btn-row-sm > a.btn,
+        .btn-row.btn-row-sm > button.btn,
+        .btn-row.btn-row-sm form .btn {
+            min-height: 32px;
+            padding: 5px 12px;
+            font-size: .8rem;
+        }
+        .btn-row form { display: inline-flex; margin: 0; }
+
         .filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
-        input, select, textarea { padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-family: inherit; }
+        .filters input[type="text"],
+        .filters input:not([type]),
+        .filters select { min-width: 0; flex: 1 1 160px; max-width: 100%; }
+
+        /* Admin form controls — unified, non-browser-default look */
+        input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+        select,
+        textarea {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 100%;
+            max-width: 100%;
+            min-height: 40px;
+            padding: 9px 12px;
+            border: 1px solid #d0d7e2;
+            border-radius: 8px;
+            background: #fff;
+            color: var(--text);
+            font-family: inherit;
+            font-size: .9rem;
+            line-height: 1.4;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+            transition: border-color .15s ease, box-shadow .15s ease;
+        }
+        textarea { min-height: 120px; resize: vertical; }
+        select {
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2364748b' d='M1.4.6 6 5.2 10.6.6 12 2 6 8 0 2z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: left 12px center;
+            padding-left: 32px;
+        }
+        input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #86c97f;
+            box-shadow: 0 0 0 3px rgba(80, 184, 72, 0.18);
+        }
+        input[type="file"] {
+            display: block;
+            width: 100%;
+            max-width: 100%;
+            padding: 10px 12px;
+            border: 1px dashed #cbd5e1;
+            border-radius: 8px;
+            background: #f8fafc;
+            color: #475569;
+            font-family: inherit;
+            font-size: .85rem;
+            cursor: pointer;
+        }
+        input[type="file"]:hover { border-color: #94a3b8; background: #f1f5f9; }
+        input[type="checkbox"],
+        input[type="radio"] {
+            width: 16px;
+            height: 16px;
+            min-height: 0;
+            margin: 0 0 0 8px;
+            vertical-align: middle;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .admin-form {
+            max-width: 640px;
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,.06);
+        }
+        .admin-form .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px 16px;
+        }
+        .admin-form .form-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin: 0;
+        }
+        .admin-form .form-field.full { grid-column: 1 / -1; }
+        .admin-form label,
+        .admin-form .form-label {
+            display: block;
+            margin: 0;
+            font-size: .85rem;
+            font-weight: 600;
+            color: #334155;
+        }
+        .admin-form .form-hint {
+            margin: 4px 0 0;
+            font-size: .78rem;
+            color: #64748b;
+        }
+        .admin-form .form-check {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 0 0;
+            font-size: .9rem;
+            font-weight: 500;
+            color: #334155;
+        }
+        .admin-form .form-check input { margin: 0; }
+        .admin-form .form-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            margin-top: 18px;
+            padding-top: 16px;
+            border-top: 1px solid #eef2f7;
+        }
+        .admin-form .form-actions .btn {
+            min-height: 38px;
+            padding: 8px 16px;
+            font-size: .875rem;
+        }
+        .filters input[type="text"],
+        .filters input:not([type]),
+        .filters input[type="date"],
+        .filters input[type="number"],
+        .filters select {
+            width: auto;
+            min-width: 0;
+            flex: 1 1 160px;
+            max-width: 100%;
+        }
+        .filters .btn { flex: 0 0 auto; min-height: 40px; }
         .msg { background: #dcfce7; color: #166534; padding: 10px 14px; border-radius: 6px; margin-bottom: 16px; }
-        .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .75rem; background: #e2e8f0; }
-        .badge-ok { background: #bbf7d0; }
-        .badge-no { background: #fecaca; }
-        .pager { margin-top: 16px; display: flex; gap: 8px; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .75rem; background: #e2e8f0; white-space: nowrap; }
+        .badge-ok { background: #bbf7d0; color: #166534; }
+        .badge-no { background: #fecaca; color: #991b1b; }
+        .badge-pending { background: #fef08a; color: #854d0e; }
+        .badge-muted { background: #e2e8f0; color: #475569; }
+        .pager { margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .page-select-label { display: inline-flex; align-items: center; gap: 8px; font-size: .9rem; color: #334155; }
+        .page-select { min-width: 72px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; direction: ltr; }
         form.inline { display: inline; }
-        @media (max-width: 768px) { .layout { flex-direction: column; } .sidebar { width: 100%; } }
+        code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: .85rem; }
+        td.date-fa { direction: ltr; text-align: left; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+        /* Chart range + cards */
+        .chart-section { margin-top: 28px; }
+        .chart-range { margin: 12px 0 8px; }
+        .range-presets {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .range-chip {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: #e2e8f0;
+            color: #334155;
+            text-decoration: none;
+            font-size: .85rem;
+            border: 1px solid transparent;
+        }
+        .range-chip:hover { background: #cbd5e1; }
+        .range-chip.active {
+            background: #50b848;
+            color: #fff;
+            border-color: #3f9a38;
+        }
+        .range-custom { margin-bottom: 0; }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 16px;
+            margin: 16px 0 24px;
+        }
+        .chart-card {
+            background: #fff;
+            border-radius: 10px;
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,.08);
+        }
+        .chart-card h2 {
+            margin: 0 0 12px;
+            font-size: 1.05rem;
+        }
+        .chart-wrap { position: relative; height: 280px; }
+        .chart-wrap-bar { height: 340px; }
+
+        /* Mobile top bar — hidden on desktop */
+        .mobile-bar {
+            display: none;
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            height: var(--mobile-bar);
+            background: var(--side);
+            color: #fff;
+            align-items: center;
+            gap: 12px;
+            padding: 0 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.2);
+        }
+        .mobile-bar .mobile-brand { font-weight: 700; font-size: 1rem; flex: 1; }
+        .menu-toggle {
+            width: 40px;
+            height: 40px;
+            border: 0;
+            border-radius: 8px;
+            background: #334155;
+            color: #fff;
+            cursor: pointer;
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 0;
+        }
+        .menu-toggle span {
+            display: block;
+            width: 18px;
+            height: 2px;
+            background: #fff;
+            border-radius: 1px;
+            transition: transform .2s, opacity .2s;
+        }
+        body.nav-open .menu-toggle span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+        body.nav-open .menu-toggle span:nth-child(2) { opacity: 0; }
+        body.nav-open .menu-toggle span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+        .sidebar-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.45);
+            z-index: 45;
+        }
+
+        @media (max-width: 900px) {
+            .mobile-bar { display: flex; }
+            .layout { flex-direction: column; }
+            .sidebar {
+                position: fixed;
+                top: 0;
+                right: 0;
+                bottom: 0;
+                width: min(280px, 86vw);
+                z-index: 50;
+                padding-top: 12px;
+                transform: translateX(105%);
+                transition: transform .25s ease;
+                overflow-y: auto;
+                box-shadow: -4px 0 24px rgba(0,0,0,.25);
+            }
+            body.nav-open .sidebar { transform: translateX(0); }
+            body.nav-open .sidebar-backdrop { display: block; }
+            body.nav-open { overflow: hidden; }
+            .sidebar .brand { display: none; }
+            .main { padding: 16px 12px 28px; }
+            h1 { font-size: 1.25rem; }
+            th, td { padding: 8px 10px; font-size: .82rem; }
+            .filters { gap: 8px; }
+            .filters .btn { flex: 0 0 auto; }
+            .admin-form { padding: 16px; }
+            .admin-form .form-grid { grid-template-columns: 1fr; }
+            .list-upload-form {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 6px;
+                align-items: center;
+                margin-top: 6px;
+            }
+            .list-upload-form input[type="file"] { max-width: 100%; font-size: .75rem; }
+            .charts-grid { grid-template-columns: 1fr; }
+            .chart-wrap, .chart-wrap-bar { height: 260px; }
+        }
     </style>
     {% block head %}{% endblock %}
 </head>
 <body>
+<header class="mobile-bar">
+    <button type="button" class="menu-toggle" id="admin-menu-toggle" aria-label="منو" aria-expanded="false" aria-controls="admin-sidebar">
+        <span></span><span></span><span></span>
+    </button>
+    <div class="mobile-brand">کابانا ادمین</div>
+</header>
+<div class="sidebar-backdrop" id="admin-sidebar-backdrop"></div>
 <div class="layout">
-    <aside class="sidebar">
+    <aside class="sidebar" id="admin-sidebar">
         <div class="brand">کابانا ادمین</div>
-        <a href="/admin/" class="{% if request.url.path == '/admin/' %}active{% endif %}">داشبورد</a>
-        <a href="/admin/books" class="{% if '/admin/books' in request.url.path %}active{% endif %}">کتاب‌ها</a>
-        <a href="/admin/books?missing_pdf=1">بدون PDF</a>
-        <a href="/admin/users" class="{% if '/admin/users' in request.url.path %}active{% endif %}">کاربران</a>
-        <a href="/admin/orders" class="{% if '/admin/orders' in request.url.path %}active{% endif %}">سفارش‌ها</a>
-        <a href="/admin/reports" class="{% if '/admin/reports' in request.url.path %}active{% endif %}">گزارش‌ها</a>
-        <a href="/">بازگشت به سایت</a>
-        <a href="/auth/logout">خروج</a>
+        <nav class="sidebar-nav">
+            <a href="/admin/" class="{% if request.url.path == '/admin/' %}active{% endif %}">داشبورد</a>
+            <a href="/admin/books" class="{% if request.url.path.startswith('/admin/books') and '/new' not in request.url.path %}active{% endif %}">کتاب‌ها</a>
+            <a href="/admin/books/new" class="{% if request.url.path == '/admin/books/new' %}active{% endif %}">افزودن کتاب</a>
+            <a href="/admin/books?missing_pdf=1">بدون فایل</a>
+            <a href="/admin/users" class="{% if '/admin/users' in request.url.path %}active{% endif %}">کاربران</a>
+            <a href="/admin/orders" class="{% if '/admin/orders' in request.url.path %}active{% endif %}">سفارش‌ها</a>
+            <a href="/admin/hero" class="{% if '/admin/hero' in request.url.path %}active{% endif %}">کاور صفحه اصلی</a>
+            <a href="/admin/reports" class="{% if '/admin/reports' in request.url.path %}active{% endif %}">گزارش‌ها</a>
+            <a href="/admin/scraper" class="{% if '/admin/scraper' in request.url.path %}active{% endif %}">اسکرپر</a>
+            <a href="/">بازگشت به سایت</a>
+            <a href="/auth/logout">خروج</a>
+        </nav>
     </aside>
     <div class="main">
         {% block content %}{% endblock %}
     </div>
 </div>
+<script>
+(function () {
+    var body = document.body;
+    var toggle = document.getElementById('admin-menu-toggle');
+    var backdrop = document.getElementById('admin-sidebar-backdrop');
+    var sidebar = document.getElementById('admin-sidebar');
+    if (!toggle || !sidebar) return;
+
+    function setOpen(open) {
+        body.classList.toggle('nav-open', open);
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    function close() { setOpen(false); }
+    function toggleNav() { setOpen(!body.classList.contains('nav-open')); }
+
+    toggle.addEventListener('click', toggleNav);
+    if (backdrop) backdrop.addEventListener('click', close);
+    sidebar.querySelectorAll('a').forEach(function (a) {
+        a.addEventListener('click', close);
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') close();
+    });
+
+    /* Wrap tables for horizontal scroll on small screens */
+    document.querySelectorAll('.main > table, .main table').forEach(function (table) {
+        if (table.parentElement && table.parentElement.classList.contains('table-wrap')) return;
+        var wrap = document.createElement('div');
+        wrap.className = 'table-wrap';
+        table.parentNode.insertBefore(wrap, table);
+        wrap.appendChild(table);
+    });
+})();
+</script>
 </body>
 </html>

@@ -1,9 +1,11 @@
 {% extends "admin/base.html" %}
+{% from "macros.html" import page_pagination %}
 {% block title %}کاربران{% endblock %}
 {% block content %}
 <h1>کاربران</h1>
+{% if message %}<div class="msg">عملیات با موفقیت انجام شد ({{ message }})</div>{% endif %}
 <form class="filters" method="get">
-    <input type="text" name="q" value="{{ q }}" placeholder="نام یا موبایل">
+    <input type="text" name="q" value="{{ q }}" placeholder="نام، موبایل، ایمیل">
     <button class="btn" type="submit">جستجو</button>
 </form>
 <p>{{ total }} کاربر</p>
@@ -20,6 +22,7 @@
             <td>{{ u.role.value }}</td>
             <td>{% if u.is_active %}<span class="badge badge-ok">فعال</span>{% else %}<span class="badge badge-no">غیرفعال</span>{% endif %}</td>
             <td>
+                <a class="btn btn-sm btn-secondary" href="/admin/users/{{ u.id }}">ویرایش</a>
                 <form class="inline" method="post" action="/admin/users/{{ u.id }}/toggle">
                     <button class="btn btn-sm {% if u.is_active %}btn-danger{% else %}btn{% endif %}" type="submit">
                         {% if u.is_active %}غیرفعال{% else %}فعال{% endif %}
@@ -32,10 +35,5 @@
         {% endfor %}
     </tbody>
 </table>
-{% if total_pages and total_pages > 1 %}
-<div class="pager">
-    {% if page > 1 %}<a class="btn btn-secondary" href="/admin/users?q={{ q|urlencode }}&page={{ page-1 }}">قبلی</a>{% endif %}
-    {% if page < total_pages %}<a class="btn btn-secondary" href="/admin/users?q={{ q|urlencode }}&page={{ page+1 }}">بعدی</a>{% endif %}
-</div>
-{% endif %}
+{{ page_pagination(page, total_pages, '/admin/users?q=' ~ (q|urlencode), 'admin') }}
 {% endblock %}
