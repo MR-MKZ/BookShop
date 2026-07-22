@@ -156,6 +156,19 @@ async def payment_callback(
     order.status = OrderStatus.PAID
     order.paid_at = datetime.now(timezone.utc)
     order.payment_gateway_ref_id = str(verify.get("refNumber") or "")
+
+    # Clear purchased books from cart
+    from app.models import Cart
+    from sqlalchemy import delete
+
+    book_ids = [item.book_id for item in order.items]
+    if book_ids:
+        await db.execute(
+            delete(Cart).where(
+                and_(Cart.user_id == order.user_id, Cart.book_id.in_(book_ids))
+            )
+        )
+
     await db.commit()
 
     return RedirectResponse(url="/profile?pay=ok", status_code=status.HTTP_303_SEE_OTHER)

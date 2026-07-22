@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}سبد خرید — کابانا{% endblock %}
+
+{% block breadcrumb %}
+<div class="breadcrumb-items">
+    <div class="row">
+        <ul class="breadcrumb">
+            <li><a href="/" class="breadcrumb-link">صفحه اصلی</a></li>
+            <li class="chevron"><span class="fa fa-chevron-left"></span></li>
+            <li><span class="breadcrumb-active">سبد خرید</span></li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="cart_area section-padding">
+    <div class="container">
+        {% if message == 'added' %}
+            <div class="alert alert-success">کتاب به سبد خرید اضافه شد.</div>
+        {% elif message == 'exists' %}
+            <div class="alert alert-info">این کتاب از قبل در سبد است.</div>
+        {% elif message == 'removed' %}
+            <div class="alert alert-success">کتاب از سبد حذف شد.</div>
+        {% elif message == 'empty' %}
+            <div class="alert alert-warning">سبد خرید خالی است.</div>
+        {% endif %}
+
+        <div class="cart_inner">
+            <div class="table-responsive">
+                {% if items %}
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th scope="col">محصول</th>
+                            <th scope="col">قیمت</th>
+                            <th scope="col"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cart_item, book in items %}
+                        <tr class="cart-item-row">
+                            <td>
+                                <div class="cart-product">
+                                    <a class="cart-product-cover" href="/book/{{ book.id }}">
+                                        <img src="/media/proxy/cover/{{ book.folder_name }}/{{ book.cover_filename or 'cover.jpg' }}"
+                                             alt="{{ book.title }}"
+                                             onerror="this.onerror=null;this.src='/static/img/book/default.jpg'">
+                                    </a>
+                                    <div class="cart-product-meta">
+                                        <a href="/book/{{ book.id }}">{{ book.title }}</a>
+                                        {% if book.author %}<p>{{ book.author }}</p>{% endif %}
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="cart-price" dir="ltr">
+                                    <span class="cart-price-amount">{{ "{:,.0f}".format(book.price|float) if book.price else 0 }}</span>
+                                    <span class="cart-price-currency">تومان</span>
+                                </div>
+                            </td>
+                            <td>
+                                <form method="post" action="/cart/remove/{{ cart_item.id }}" class="cart-remove-form">
+                                    <button type="submit" class="cart-remove-btn" title="حذف از سبد" aria-label="حذف از سبد">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="last-tr">
+                            <td><h5>جمع کل</h5></td>
+                            <td colspan="2">
+                                <div class="cart-price cart-price--total" dir="ltr">
+                                    <span class="cart-price-amount">{{ "{:,.0f}".format(total) }}</span>
+                                    <span class="cart-price-currency">تومان</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="checkout_btn_inner float-right">
+                    <a class="btn" href="/search">ادامه خرید</a>
+                    {% if current_user %}
+                        <form method="post" action="/cart/checkout" style="display:inline;">
+                            <button type="submit" class="btn checkout_btn">تسویه حساب</button>
+                        </form>
+                    {% else %}
+                        <a class="btn checkout_btn" href="/auth/login?next=/cart">ورود برای پرداخت</a>
+                    {% endif %}
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <p>سبد خرید شما خالی است.</p>
+                    <a href="/search" class="btn">مشاهده کتاب‌ها</a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}
