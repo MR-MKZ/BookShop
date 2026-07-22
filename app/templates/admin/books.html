@@ -1,12 +1,18 @@
 {% extends "admin/base.html" %}
+{% from "macros.html" import page_pagination %}
 {% block title %}کتاب‌ها{% endblock %}
 {% block content %}
 <h1>مدیریت کتاب‌ها</h1>
-{% if message %}<div class="msg">عملیات با موفقیت انجام شد ({{ message }})</div>{% endif %}
+{% if message == 'uploaded' %}
+<div class="msg">فایل{% if uploaded_id %} کتاب #{{ uploaded_id }}{% endif %} با موفقیت آپلود شد.</div>
+{% elif message %}
+<div class="msg">عملیات با موفقیت انجام شد ({{ message }})</div>
+{% endif %}
 <form class="filters" method="get" action="/admin/books">
-    <input type="text" name="q" value="{{ q }}" placeholder="جستجو عنوان / نویسنده / ISBN">
-    <label><input type="checkbox" name="missing_pdf" value="1" {% if missing_pdf %}checked{% endif %}> فقط بدون PDF</label>
+    <input type="text" name="q" value="{{ q }}" placeholder="شناسه / عنوان FA/EN / نویسنده / ناشر / ISBN / پوشه" style="min-width:280px;">
+    <label><input type="checkbox" name="missing_pdf" value="1" {% if missing_pdf %}checked{% endif %}> فقط بدون فایل</label>
     <button class="btn" type="submit">فیلتر</button>
+    <a class="btn" href="/admin/books/new">افزودن کتاب</a>
 </form>
 <p>{{ total }} کتاب — صفحه {{ page }}{% if total_pages %} از {{ total_pages }}{% endif %}</p>
 <table>
@@ -16,25 +22,29 @@
             <th>عنوان</th>
             <th>نویسنده</th>
             <th>قیمت</th>
-            <th>PDF</th>
+            <th>فایل</th>
             <th>وضعیت</th>
             <th>عملیات</th>
         </tr>
     </thead>
     <tbody>
         {% for book in books %}
-        <tr>
+        <tr{% if uploaded_id and uploaded_id|string == book.id|string %} style="background:#f0fdf4;"{% endif %}>
             <td>{{ book.id }}</td>
-            <td>{{ book.title }}</td>
+            <td>
+                {{ book.title }}
+                {% if book.title_en %}<br><small dir="ltr" style="color:#64748b;">{{ book.title_en }}</small>{% endif %}
+            </td>
             <td>{{ book.author or '—' }}</td>
             <td dir="ltr">{{ "{:,.0f}".format(book.price|float) if book.price else 0 }}</td>
             <td>
                 {% if book.has_pdf %}
-                    <span class="badge badge-ok">دارد</span>
+                    <span class="badge badge-ok">{{ book.file_format or 'pdf' }}</span>
                 {% else %}
                     <span class="badge badge-no">ندارد</span>
-                    <form class="inline" action="/admin/books/{{ book.id }}/upload" method="post" enctype="multipart/form-data">
-                        <input type="file" name="file" accept=".pdf,application/pdf" required>
+                    <form class="inline list-upload-form" action="/admin/books/{{ book.id }}/upload" method="post" enctype="multipart/form-data">
+                        <input type="hidden" name="next" value="/admin/books?q={{ q|urlencode }}&missing_pdf={{ missing_pdf }}&page={{ page }}">
+                        <input type="file" name="file" accept=".{{ allowed_exts|join(',.') }}" required>
                         <button class="btn btn-sm" type="submit">آپلود</button>
                     </form>
                 {% endif %}
@@ -47,10 +57,5 @@
         {% endfor %}
     </tbody>
 </table>
-{% if total_pages and total_pages > 1 %}
-<div class="pager">
-    {% if page > 1 %}<a class="btn btn-secondary" href="/admin/books?q={{ q|urlencode }}&missing_pdf={{ missing_pdf }}&page={{ page-1 }}">قبلی</a>{% endif %}
-    {% if page < total_pages %}<a class="btn btn-secondary" href="/admin/books?q={{ q|urlencode }}&missing_pdf={{ missing_pdf }}&page={{ page+1 }}">بعدی</a>{% endif %}
-</div>
-{% endif %}
+{{ page_pagination(page, total_pages, '/admin/books?q=' ~ (q|urlencode) ~ '&missing_pdf=' ~ missing_pdf, 'admin') }}
 {% endblock %}

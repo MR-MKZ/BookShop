@@ -2,26 +2,92 @@
 {% block title %}ویرایش کتاب{% endblock %}
 {% block content %}
 <h1>ویرایش کتاب #{{ book.id }}</h1>
+{% if message %}<div class="msg">عملیات با موفقیت انجام شد ({{ message }})</div>{% endif %}
 {% if error %}<div class="msg" style="background:#fecaca;color:#991b1b;">{{ error }}</div>{% endif %}
-<form method="post" action="/admin/books/{{ book.id }}">
-    <p><label>عنوان<br><input name="title" value="{{ book.title or '' }}" style="width:100%;max-width:480px;" required></label></p>
-    <p><label>نویسنده<br><input name="author" value="{{ book.author or '' }}" style="width:100%;max-width:480px;"></label></p>
-    <p><label>ناشر<br><input name="publisher" value="{{ book.publisher or '' }}" style="width:100%;max-width:480px;"></label></p>
-    <p><label>قیمت فروش (تومان)<br><input name="price" value="{{ book.price or 0 }}" dir="ltr"></label></p>
-    <p><label>قیمت اصلی خط‌خورده<br><input name="original_price" value="{{ book.original_price or '' }}" dir="ltr"></label></p>
-    <p><label>توضیحات<br><textarea name="description" rows="8" style="width:100%;max-width:640px;">{{ book.description or '' }}</textarea></label></p>
-    <p><label><input type="checkbox" name="is_active" {% if book.is_active %}checked{% endif %}> فعال</label></p>
-    <p>
+
+<form class="admin-form" method="post" action="/admin/books/{{ book.id }}">
+    <div class="form-grid">
+        <div class="form-field full">
+            <label for="title">عنوان فارسی</label>
+            <input id="title" name="title" value="{{ book.title or '' }}" required>
+        </div>
+        <div class="form-field full">
+            <label for="title_en">عنوان انگلیسی</label>
+            <input id="title_en" name="title_en" value="{{ book.title_en or '' }}" dir="ltr">
+        </div>
+        <div class="form-field">
+            <label for="author">نویسنده</label>
+            <input id="author" name="author" value="{{ book.author or '' }}">
+        </div>
+        <div class="form-field">
+            <label for="publisher">ناشر</label>
+            <input id="publisher" name="publisher" value="{{ book.publisher or '' }}">
+        </div>
+        <div class="form-field full">
+            <label for="isbn">ISBN</label>
+            <input id="isbn" name="isbn" value="{{ book.isbn or '' }}" dir="ltr">
+        </div>
+        <div class="form-field">
+            <label for="price">قیمت فروش (تومان)</label>
+            <input id="price" name="price" value="{{ book.price or 0 }}" dir="ltr">
+        </div>
+        <div class="form-field">
+            <label for="original_price">قیمت اصلی خط‌خورده</label>
+            <input id="original_price" name="original_price" value="{{ book.original_price or '' }}" dir="ltr">
+        </div>
+        <div class="form-field full">
+            <label for="description">توضیحات</label>
+            <textarea id="description" name="description" rows="8">{{ book.description or '' }}</textarea>
+        </div>
+        <div class="form-field full">
+            <label class="form-check">
+                <input type="checkbox" name="is_active" {% if book.is_active %}checked{% endif %}>
+                فعال
+            </label>
+        </div>
+    </div>
+    <div class="form-actions">
         <button class="btn" type="submit">ذخیره</button>
         <a class="btn btn-secondary" href="/admin/books">بازگشت</a>
-    </p>
+    </div>
 </form>
-{% if not book.has_pdf %}
+
 <hr>
-<h2>آپلود PDF</h2>
-<form action="/admin/books/{{ book.id }}/upload" method="post" enctype="multipart/form-data">
-    <input type="file" name="file" accept=".pdf,application/pdf" required>
-    <button class="btn" type="submit">آپلود به FTP</button>
+<h2>فایل کتاب</h2>
+<div class="card" style="max-width:640px;margin-bottom:16px;">
+    {% if book.has_pdf %}
+        <p style="margin:0 0 12px;overflow-wrap:anywhere;word-break:break-word;">
+            فایل فعلی: <strong dir="ltr">{{ book.pdf_filename }}</strong>
+            {% if book.file_size %} ({{ book.file_size }}){% endif %}
+            —
+            {% if file_exists %}
+                <span class="badge badge-ok">موجود در سرور</span>
+            {% else %}
+                <span class="badge badge-no">در دیتابیس هست ولی فایل یافت نشد</span>
+            {% endif %}
+        </p>
+        <div class="btn-row btn-row-sm">
+            <a class="btn btn-sm" href="/admin/books/{{ book.id }}/file">دانلود</a>
+            <form method="post" action="/admin/books/{{ book.id }}/file/delete" onsubmit="return confirm('حذف فایل؟');">
+                <button class="btn btn-sm btn-danger" type="submit">حذف فایل</button>
+            </form>
+        </div>
+    {% else %}
+        <p><span class="badge badge-no">فایلی ثبت نشده</span></p>
+    {% endif %}
+</div>
+
+<form class="admin-form" action="/admin/books/{{ book.id }}/upload" method="post" enctype="multipart/form-data">
+    <div class="form-grid">
+        <div class="form-field full">
+            <label for="book_file">{% if book.has_pdf %}جایگزینی فایل{% else %}آپلود فایل{% endif %}</label>
+            <input id="book_file" type="file" name="file" accept=".{{ allowed_exts|join(',.') }}" required>
+            <p class="form-hint">فرمت‌های مجاز: {{ allowed_exts|join(', ') }}</p>
+        </div>
+    </div>
+    <div class="form-actions">
+        <button class="btn" type="submit">{% if book.has_pdf %}جایگزین کن{% else %}آپلود{% endif %}</button>
+    </div>
 </form>
-{% endif %}
+<p style="color:#64748b;font-size:.85rem;margin-top:8px;">پوشه: <span dir="ltr">{{ book.folder_name }}</span></p>
 {% endblock %}
