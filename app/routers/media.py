@@ -1,17 +1,31 @@
 import os
 import re
+from pathlib import Path
+
 import aiofiles
 import aioftp
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import StreamingResponse, Response
+from fastapi.responses import FileResponse, StreamingResponse, Response
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from app.config import settings
+from app.models import Book
 
 router = APIRouter(prefix="/media/proxy", tags=["media"])
 
 # Use SECRET_KEY for signing and validating links
 signer = URLSafeTimedSerializer(settings.SECRET_KEY)
+
+DEFAULT_COVER_PATH = Path(__file__).resolve().parent.parent / "static" / "img" / "book" / "default.jpg"
+
+
+def _attachment_headers(
+    storage_filename: str, download_name: str | None, book_id: int | None
+) -> dict[str, str]:
+    name = download_name or storage_filename
+    return {
+        "Content-Disposition": Book.content_disposition(name, book_id),
+    }
 
 
 def is_safe_path(path_part: str) -> bool:
@@ -107,6 +121,26 @@ async def check_file_exists(folder_name: str, filename: str) -> bool:
             return False
 
 
+BOOK_CONTENT_TYPES = {
+    ".pdf": "application/pdf",
+    ".epub": "application/epub+zip",
+    ".mobi": "application/x-mobipocket-ebook",
+    ".azw": "application/vnd.amazon.ebook",
+    ".azw3": "application/vnd.amazon.ebook",
+    ".fb2": "application/x-fictionbook+xml",
+    ".djvu": "image/vnd.djvu",
+    ".txt": "text/plain",
+    ".rar": "application/vnd.rar",
+    ".zip": "application/zip",
+    ".7z": "application/x-7z-compressed",
+}
+
+
+def book_media_type(filename: str) -> str:
+    _, ext = os.path.splitext(filename.lower())
+    return BOOK_CONTENT_TYPES.get(ext, "application/octet-stream")
+
+
 @router.get("/cover/{folder_name}/{filename}")
 async def proxy_cover(folder_name: str, filename: str):
     """
@@ -118,8 +152,14 @@ async def proxy_cover(folder_name: str, filename: str):
     if ext not in allowed_exts:
         raise HTTPException(status_code=403, detail="Invalid media type")
 
-    # Check existence to avoid 200 OK with empty body / infinite reloads
+    # Missing covers: serve a static default instead of 404 (avoids client retry spam)
     if not await check_file_exists(folder_name, filename):
+        if DEFAULT_COVER_PATH.is_file():
+            return FileResponse(
+                DEFAULT_COVER_PATH,
+                media_type="image/jpeg",
+                headers={"Cache-Control": "public, max-age=3600"},
+            )
         return Response(status_code=404)
 
     media_type = "image/jpeg"
@@ -129,6 +169,32 @@ async def proxy_cover(folder_name: str, filename: str):
         media_type = "image/webp"
 
     return StreamingResponse(stream_media(folder_name, filename), media_type=media_type)
+
+
+@router.get("/hero/{filename}")
+async def proxy_hero(filename: str):
+    """Public landing-page hero images (always from local MEDIA_ROOT/hero)."""
+    if not is_safe_path(filename):
+        raise HTTPException(status_code=403, detail="Invalid path")
+    allowed_exts = {".jpg", ".jpeg", ".png", ".webp"}
+    _, ext = os.path.splitext(filename.lower())
+    if ext not in allowed_exts:
+        raise HTTPException(status_code=403, detail="Invalid media type")
+
+    path = Path(settings.MEDIA_ROOT) / "hero" / filename
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Hero image not found")
+
+    media_type = "image/jpeg"
+    if ext == ".png":
+        media_type = "image/png"
+    elif ext == ".webp":
+        media_type = "image/webp"
+    return FileResponse(
+        path,
+        media_type=media_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @router.get("/book/{folder_name}/{filename}")
@@ -151,8 +217,11 @@ async def proxy_book(folder_name: str, filename: str, token: str = Query(...)):
     if not await check_file_exists(folder_name, filename):
         raise HTTPException(status_code=404, detail="فایل یافت نشد")
 
+    download_name = data.get("download_name") if isinstance(data, dict) else None
+    book_id = data.get("book_id") if isinstance(data, dict) else None
+
     return StreamingResponse(
         stream_media(folder_name, filename),
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        media_type=book_media_type(filename),
+        headers=_attachment_headers(filename, download_name, book_id),
     )
