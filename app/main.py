@@ -2,7 +2,7 @@ import os
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -115,3 +115,9 @@ async def admin_auth_redirect_handler(request: Request, exc: AdminAuthRedirect):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/29498328.txt")
+async def domain_verification_file():
+    path = os.path.join(static_path, "29498328.txt")
+    return FileResponse(path, media_type="text/plain")
