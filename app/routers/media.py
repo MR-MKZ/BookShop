@@ -1,10 +1,10 @@
+import hashlib
+import logging
 import os
-import re
 from pathlib import Path
 
 import aiofiles
-import aioftp
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse, Response
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
@@ -12,11 +12,22 @@ from app.config import settings
 from app.models import Book
 
 router = APIRouter(prefix="/media/proxy", tags=["media"])
+logger = logging.getLogger(__name__)
 
 # Use SECRET_KEY for signing and validating links
 signer = URLSafeTimedSerializer(settings.SECRET_KEY)
 
 DEFAULT_COVER_PATH = Path(__file__).resolve().parent.parent / "static" / "img" / "book" / "default.jpg"
+
+# Covers change rarely; allow long browser/CDN cache (proxy still used — never direct FTP).
+COVER_CACHE_CONTROL = "public, max-age=604800, stale-while-revalidate=86400"
+HERO_CACHE_CONTROL = "public, max-age=86400, stale-while-revalidate=3600"
+DEFAULT_COVER_CACHE_CONTROL = "public, max-age=86400"
+
+
+def _cover_etag(folder_name: str, filename: str) -> str:
+    digest = hashlib.sha1(f"{folder_name}/{filename}".encode()).hexdigest()[:16]
+    return f'W/"{digest}"'
 
 
 def _attachment_headers(
@@ -49,7 +60,9 @@ async def stream_media(folder_name: str, filename: str):
     """
     # Security: Validate paths to prevent traversal
     if not is_safe_path(folder_name) or not is_safe_path(filename):
-        print(f"Security Alert: Path traversal attempt detected: {folder_name}/{filename}")
+        logger.warning(
+            "Path traversal attempt blocked: %s/%s", folder_name, filename
+        )
         yield b""
         return
 
@@ -81,18 +94,14 @@ async def stream_media(folder_name: str, filename: str):
     # FTP Server Mode
     else:
         try:
-            async with aioftp.Client.context(
-                host=settings.FTP_HOST,
-                port=settings.FTP_PORT,
-                user=settings.FTP_USER,
-                password=settings.FTP_PASS,
-                socket_timeout=15,
-            ) as client:
+            from app.services.ftp_client import ftp_client
+
+            async with ftp_client() as client:
                 async with client.download_stream(file_path) as stream:
                     async for block in stream.iter_by_block(8192):
                         yield block
         except Exception as e:
-            print(f"FTP Stream Error ({settings.FTP_HOST}): {e}")
+            logger.error("FTP stream error (%s): %s", settings.FTP_HOST, e)
             yield b""
 
 
@@ -103,21 +112,16 @@ async def check_file_exists(folder_name: str, filename: str) -> bool:
         return os.path.exists(full_path)
     else:
         try:
-            async with aioftp.Client.context(
-                host=settings.FTP_HOST,
-                port=settings.FTP_PORT,
-                user=settings.FTP_USER,
-                password=settings.FTP_PASS,
-                socket_timeout=5,
-            ) as client:
+            from app.services.ftp_client import ftp_client
+
+            async with ftp_client() as client:
                 file_path = f"{folder_name}/{filename}"
-                # aioftp doesn't have a simple exists(), try stat or listing
                 try:
                     await client.stat(file_path)
                     return True
-                except:
+                except Exception:
                     return False
-        except:
+        except Exception:
             return False
 
 
@@ -142,9 +146,9 @@ def book_media_type(filename: str) -> str:
 
 
 @router.get("/cover/{folder_name}/{filename}")
-async def proxy_cover(folder_name: str, filename: str):
+async def proxy_cover(folder_name: str, filename: str, request: Request):
     """
-    Public access to book covers.
+    Public access to book covers (proxied). Browser-cacheable.
     """
     # Security: Validate file extension
     allowed_exts = {".jpg", ".jpeg", ".png", ".webp"}
@@ -152,13 +156,30 @@ async def proxy_cover(folder_name: str, filename: str):
     if ext not in allowed_exts:
         raise HTTPException(status_code=403, detail="Invalid media type")
 
+    if not is_safe_path(folder_name) or not is_safe_path(filename):
+        raise HTTPException(status_code=403, detail="Invalid path")
+
+    etag = _cover_etag(folder_name, filename)
+    if_none_match = request.headers.get("if-none-match")
+    if if_none_match and if_none_match == etag:
+        return Response(
+            status_code=304,
+            headers={
+                "ETag": etag,
+                "Cache-Control": COVER_CACHE_CONTROL,
+            },
+        )
+
     # Missing covers: serve a static default instead of 404 (avoids client retry spam)
     if not await check_file_exists(folder_name, filename):
         if DEFAULT_COVER_PATH.is_file():
             return FileResponse(
                 DEFAULT_COVER_PATH,
                 media_type="image/jpeg",
-                headers={"Cache-Control": "public, max-age=3600"},
+                headers={
+                    "Cache-Control": DEFAULT_COVER_CACHE_CONTROL,
+                    "ETag": etag,
+                },
             )
         return Response(status_code=404)
 
@@ -168,11 +189,19 @@ async def proxy_cover(folder_name: str, filename: str):
     elif ext == ".webp":
         media_type = "image/webp"
 
-    return StreamingResponse(stream_media(folder_name, filename), media_type=media_type)
+    return StreamingResponse(
+        stream_media(folder_name, filename),
+        media_type=media_type,
+        headers={
+            "Cache-Control": COVER_CACHE_CONTROL,
+            "ETag": etag,
+            "Accept-Ranges": "none",
+        },
+    )
 
 
 @router.get("/hero/{filename}")
-async def proxy_hero(filename: str):
+async def proxy_hero(filename: str, request: Request):
     """Public landing-page hero images (always from local MEDIA_ROOT/hero)."""
     if not is_safe_path(filename):
         raise HTTPException(status_code=403, detail="Invalid path")
@@ -185,6 +214,17 @@ async def proxy_hero(filename: str):
     if not path.is_file():
         raise HTTPException(status_code=404, detail="Hero image not found")
 
+    etag = _cover_etag("hero", filename)
+    if_none_match = request.headers.get("if-none-match")
+    if if_none_match and if_none_match == etag:
+        return Response(
+            status_code=304,
+            headers={
+                "ETag": etag,
+                "Cache-Control": HERO_CACHE_CONTROL,
+            },
+        )
+
     media_type = "image/jpeg"
     if ext == ".png":
         media_type = "image/png"
@@ -193,7 +233,10 @@ async def proxy_hero(filename: str):
     return FileResponse(
         path,
         media_type=media_type,
-        headers={"Cache-Control": "public, max-age=86400"},
+        headers={
+            "Cache-Control": HERO_CACHE_CONTROL,
+            "ETag": etag,
+        },
     )
 
 
@@ -202,12 +245,18 @@ async def proxy_book(folder_name: str, filename: str, token: str = Query(...)):
     """
     Protected access to book files with timed token.
     Token must include matching folder/filename and optionally user_id/book_id.
+    Payload may include ``exp`` (unix timestamp) for admin-configured TTL.
     """
+    from app.services.downloads import DOWNLOAD_SIGNER_MAX_AGE, token_expired
+
     try:
-        data = signer.loads(token, salt="pdf-download", max_age=3600)
+        data = signer.loads(token, salt="pdf-download", max_age=DOWNLOAD_SIGNER_MAX_AGE)
 
         if data.get("filename") != filename or data.get("folder") != folder_name:
             raise BadSignature("Token mismatch")
+
+        if isinstance(data, dict) and token_expired(data):
+            raise SignatureExpired("Embedded expiry passed")
 
     except SignatureExpired:
         raise HTTPException(status_code=403, detail="لینک دانلود منقضی شده است")
