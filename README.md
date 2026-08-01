@@ -3,109 +3,88 @@
 Digital bookstore built with **FastAPI**, **Jinja2** (Kabana RTL theme), and **PostgreSQL**.
 Book metadata is scraped separately (`app/scraper.py`); this app serves the storefront.
 
-## Quick start (local, no Docker)
+## Features
 
-Useful when Docker is unavailable (e.g. some cloud agent environments).
+- Guest checkout + optional account, coupons, multi-gateway payments (Zibal)
+- Kabana storefront: home, search, book detail, dual pricing, cart
+- Auth with Iranian mobile + password
+- Signed, TTL-limited download links; order recovery without relying on IP
+- Admin: books, users, orders, coupons, download TTL, scraper status, reports
+- Media proxied through the app (clients never talk to FTP/DL host)
 
-### Prerequisites
-
-- Python 3.12+
-- PostgreSQL 15+ (16 works)
-- `libmagic1` (optional, for media sniffing)
-
-### Setup
-
-```bash
-# 1. Environment
-cp .env.example .env
-# Edit .env: point DATABASE_URL / SYNC_DATABASE_URL at localhost,
-# set FTP_ENABLED=False and MEDIA_ROOT to a local folder (e.g. ./storage)
-
-# 2. Database
-sudo -u postgres createuser -P kabana_user   # password: kabana_pass
-sudo -u postgres createdb -O kabana_user kabana_db
-
-# 3. Python
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-
-# 4. Migrate + seed (~600 sample books + admin user)
-mkdir -p storage
-alembic upgrade head
-python scripts/seed_dev.py
-
-# 5. Run
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-Open http://127.0.0.1:8000 — health check: http://127.0.0.1:8000/health
-
-**Seeded admin:** phone `09153276607` / password `admin123` (پنل: `/admin/`)
-
-### Local `.env` highlights
-
-```env
-DB_HOST=127.0.0.1
-DATABASE_URL=postgresql+asyncpg://kabana_user:kabana_pass@127.0.0.1:5432/kabana_db
-SYNC_DATABASE_URL=postgresql://kabana_user:kabana_pass@127.0.0.1:5432/kabana_db
-MEDIA_ROOT=/absolute/path/to/storage
-FTP_ENABLED=False
-SECRET_KEY=change_me
-ZIBAL_MERCHANT=zibal
-ZIBAL_CALLBACK_URL=http://127.0.0.1:8000/payment/callback
-BASE_URL=http://127.0.0.1:8000
-```
-
-### Features (vertical slice)
-
-- Kabana Jinja storefront: home, search (paginated + trigram indexes), book detail, dual pricing
-- Auth with Iranian mobile + password (register/login)
-- Zibal sandbox checkout (`merchant=zibal`) → owned library + gated PDF download
-- Admin panel: books (filter missing PDF + upload to FTP), users, orders, date-range reports
-- Scraper stores sale price 2–3k below source and strikethrough original 30–40k above
-
-## Docker Compose (when Docker is available)
+## Quick start (Docker — recommended)
 
 ```bash
 cp .env.example .env
-# For Compose, use DB_HOST=db and FTP_ENABLED=True (defaults in .env.example)
+# Set strong SECRET_KEY, POSTGRES_PASSWORD, ADMIN_PASSWORD
+# Generate SECRET_KEY:
+#   python -c "import secrets; print(secrets.token_urlsafe(48))"
 
 docker compose --profile dev up --build
 ```
 
-| Service      | URL / port        |
-|--------------|-------------------|
-| Web (dev)    | http://localhost:8000 |
-| PostgreSQL   | localhost:5432    |
-| pgAdmin      | http://localhost:5050 |
-| Filebrowser  | http://localhost:8080 |
-| FTP          | localhost:21      |
+| Service     | URL |
+|-------------|-----|
+| Web (dev)   | http://localhost:8000 |
+| pgAdmin     | http://localhost:5050 |
+| Filebrowser | http://localhost:8080 |
+| FTP (dev)   | localhost:21 |
+
+PostgreSQL is **not** published on the host (avoids other apps hammering `:5432`). Inspect with:
 
 ```bash
-# Production
-docker compose --profile prod up --build
+docker exec -it kabana_db psql -U kabana_user -d kabana_db
+```
 
-# Scraper (needs DB up)
-docker compose --profile scraper up --build scraper
+### Scraper
+
+```bash
+# Needs db already running (dev or prod profile)
+docker compose --profile scraper up -d --build scraper
+```
+
+### Production
+
+```bash
+# 1. .env: ENVIRONMENT=prod, strong SECRET_KEY, real DOMAIN_NAME / SSL_EMAIL,
+#    BASE_URL + ZIBAL_CALLBACK_URL as https://your.domain/...
+./scripts/gen_secret_key.sh --write
+
+# 2. Start stack (HTTP needed for ACME)
+docker compose --profile prod up --build -d
+
+# 3. Issue Let's Encrypt certs → nginx/ssl/server.{crt,key} + auto-renew
+sudo ./scripts/setup_ssl.sh
+```
+
+Nginx terminates TLS on `:443` and proxies to `web_prod`. `/docs` is disabled when `ENVIRONMENT=prod`.
+Certbot renews automatically (`certbot.timer` or cron); deploy hook reloads nginx.
+
+## Local (no Docker)
+
+```bash
+cp .env.example .env
+# Point DATABASE_URL at localhost Postgres; FTP_ENABLED=False; MEDIA_ROOT=./storage
+
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+mkdir -p storage
+alembic upgrade head
+python scripts/seed_dev.py   # optional; needs books_data_backup.db locally
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 ## Project layout
 
 ```
 app/                 FastAPI app, templates, static Kabana assets
-kabana/              Original static HTML theme (reference)
+kabana/              Original static HTML theme (design reference — do not edit as live app)
 alembic/             Migrations
-scripts/seed_dev.py  Dev seed from books_data_backup.db
+scripts/             wait_for_db, ensure_admin, seed_dev, setup_ssl, gen_secret_key
+nginx/               Prod reverse proxy + ssl/ + certbot-www/ (certs not in git)
 docker-compose.yml   Profiles: dev | prod | scraper
 ```
 
 ## Theme license
 
-Kabana HTML theme purchased from RTL Theme / راست‌چین.
-Purchase/license code (for theme records): `56417913883`
-
-## Current status
-
-Implemented: home, search, book detail, auth (username/email + password), media proxy.
-Not yet: Zibal payment, phone-based auth, full admin panel, purchase-gated downloads, dual pricing.
+Kabana HTML theme from RTL Theme / راست‌چین. Set `KABANA_LICENSE` in `.env`.
