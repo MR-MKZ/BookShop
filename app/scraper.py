@@ -5,6 +5,7 @@ import logging
 import os
 import random
 import re
+import signal
 import socket
 import sys
 
@@ -302,22 +303,23 @@ class BookScraper:
             ext = "webp"
 
         filename = f"cover.{ext}"
-
-        ftp_client = None
+        client = None
         try:
+            from app.services.ftp_client import enter_ftp_base
+
             client = aioftp.Client()
             await client.connect(FTP_HOST, FTP_PORT)
             await client.login(FTP_USER, FTP_PASS)
-            ftp_client = client
+            await enter_ftp_base(client)
 
             try:
-                await ftp_client.make_directory(folder_name)
+                await client.make_directory(folder_name)
             except aioftp.StatusCodeError:
                 pass
 
-            await ftp_client.change_directory(folder_name)
+            await client.change_directory(folder_name)
 
-            async with ftp_client.upload_stream(filename) as stream:
+            async with client.upload_stream(filename) as stream:
                 await stream.write(image_data)
 
             logger.info(f"Uploaded cover for {folder_name}")
@@ -327,8 +329,11 @@ class BookScraper:
             logger.error(f"FTP Error for {folder_name}: {e}")
             return None
         finally:
-            if ftp_client:
-                await ftp_client.quit()
+            if client is not None:
+                try:
+                    await client.quit()
+                except Exception:
+                    pass
 
     async def check_exists(self, url: str) -> bool:
         """Fast existence check by URL."""
@@ -630,16 +635,29 @@ class BookScraper:
 
     # WORKER 3: DB WRITER
     async def db_writer(self):
+        """Flush often so Ctrl+C / docker stop does not lose scraped rows."""
         batch = []
+        flush_size = 25
+        flush_timeout = 5.0
         while True:
-            data = await self.db_queue.get()
+            try:
+                data = await asyncio.wait_for(
+                    self.db_queue.get(), timeout=flush_timeout
+                )
+            except asyncio.TimeoutError:
+                if batch:
+                    await self.save_batch(batch)
+                    batch = []
+                continue
+
             if data is None:
+                self.db_queue.task_done()
                 break
 
             batch.append(data)
             self.db_queue.task_done()
 
-            if len(batch) >= 200:
+            if len(batch) >= flush_size:
                 await self.save_batch(batch)
                 batch = []
 
@@ -701,7 +719,11 @@ class BookScraper:
                     ],
                 )
                 self.books_saved += len(unique)
-                logger.info(f"DB: Saved {len(unique)} books")
+                logger.info(
+                    "DB: flushed %s books (running total=%s)",
+                    len(unique),
+                    self.books_saved,
+                )
                 await self.update_run()
         except Exception as e:
             logger.error(f"DB Write Error: {e}")
@@ -710,6 +732,23 @@ class BookScraper:
         await self.init_db()
         await self.load_known_content_keys()
         error_msg = None
+        stop_requested = asyncio.Event()
+        loop = asyncio.get_running_loop()
+
+        def _request_stop():
+            if not stop_requested.is_set():
+                logger.warning(
+                    "Stop signal received — flushing DB and shutting down workers..."
+                )
+                stop_requested.set()
+
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                loop.add_signal_handler(sig, _request_stop)
+            except NotImplementedError:
+                pass
+
+        db_task = None
         try:
             conn = aiohttp.TCPConnector(limit=0)
 
@@ -735,29 +774,52 @@ class BookScraper:
                         asyncio.create_task(self.downloader_worker(i, session))
                     )
 
-                await self.page_queue.join()
+                join_pages = asyncio.create_task(self.page_queue.join())
+                stop_wait = asyncio.create_task(stop_requested.wait())
+                done, pending = await asyncio.wait(
+                    {join_pages, stop_wait},
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                for t in pending:
+                    t.cancel()
+
                 self.stop_discovery.set()
 
-                await self.details_queue.join()
-                await asyncio.gather(*dl_tasks)
+                if stop_requested.is_set():
+                    for t in dl_tasks + tasks:
+                        t.cancel()
+                    await asyncio.gather(*dl_tasks, *tasks, return_exceptions=True)
+                    # Allow timeout-based writer to flush any queued rows
+                    await asyncio.sleep(6)
+                else:
+                    await self.details_queue.join()
+                    await asyncio.gather(*dl_tasks)
+                    for t in tasks:
+                        t.cancel()
 
                 await self.db_queue.put(None)
                 await db_task
 
-                for t in tasks:
-                    t.cancel()
-
             await self.finish_run("COMPLETED")
-            logger.info("Scraping Completed Successfully.")
+            logger.info(
+                "Scraping finished. books_saved=%s early_stop=%s",
+                self.books_saved,
+                stop_requested.is_set(),
+            )
         except Exception as e:
             error_msg = str(e)
             logger.error(f"Scraping failed: {e}")
+            if db_task and not db_task.done():
+                try:
+                    await self.db_queue.put(None)
+                    await asyncio.wait_for(db_task, timeout=30)
+                except Exception:
+                    pass
             await self.finish_run("FAILED", error=error_msg)
             raise
         finally:
             if self.db_pool:
                 await self.db_pool.close()
-
 
 if __name__ == "__main__":
     if sys.platform.startswith("win"):
@@ -766,7 +828,22 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="High Performance Pipeline Scraper")
     parser.add_argument("--url", default=DEFAULT_BASE_URL)
     parser.add_argument("--turbo", action="store_true", help="Enable aggressive settings")
-    parser.add_argument("--update", action="store_true", help="Smart update mode")
+    parser.add_argument(
+        "--update",
+        action="store_true",
+        help="Smart update: stop when a listing page has only known books",
+    )
+    parser.add_argument(
+        "--loop",
+        action="store_true",
+        help="Keep running: after each pass, sleep and scrape again (use with --update)",
+    )
+    parser.add_argument(
+        "--loop-interval",
+        type=int,
+        default=int(os.getenv("SCRAPER_LOOP_INTERVAL", "3600")),
+        help="Seconds between loop passes (default: env SCRAPER_LOOP_INTERVAL or 3600)",
+    )
     parser.add_argument("--start-page", type=int, default=1)
     parser.add_argument("--end-page", type=int)
     parser.add_argument("--concurrency", type=int, default=DEFAULT_CONCURRENCY)
@@ -782,5 +859,26 @@ if __name__ == "__main__":
         args.timeout = 15
         print(">>> TURBO MODE ENGAGED: Concurrency=200, Workers=100")
 
-    scraper = BookScraper(args)
-    asyncio.run(scraper.main())
+    if args.loop and not args.update:
+        args.update = True
+        logger.info("--loop enabled: turning on --update for incremental passes")
+
+    async def _run() -> None:
+        while True:
+            scraper = BookScraper(args)
+            try:
+                await scraper.main()
+            except Exception as e:
+                logger.error(f"Scraper pass failed: {e}")
+                if not args.loop:
+                    raise
+            if not args.loop:
+                break
+            interval = max(60, int(args.loop_interval or 3600))
+            logger.info(
+                "Update pass finished. Sleeping %ss before next scrape...",
+                interval,
+            )
+            await asyncio.sleep(interval)
+
+    asyncio.run(_run())
