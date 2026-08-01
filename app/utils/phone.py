@@ -71,7 +71,7 @@ def validate_iran_phone(raw: str | None) -> tuple[bool, str]:
         return False, "شماره تلفن الزامی است"
 
     if not _PHONE_RE.match(phone):
-        return False, "فرمت شماره باید مانند 09153276607 باشد"
+        return False, "فرمت شماره باید مانند 09121112233 باشد"
 
     prefix = phone[:4]
     if prefix not in VALID_PREFIXES:

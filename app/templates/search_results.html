@@ -13,6 +13,8 @@
                         <h2>نتایج جستجو</h2>
                         {% if query %}
                             <p>{{ total }} نتیجه برای «{{ query }}»</p>
+                        {% else %}
+                            <p>عنوان، نویسنده یا ناشر را جستجو کنید</p>
                         {% endif %}
                     </div>
                 </div>
@@ -23,16 +25,22 @@
 
 <div class="listing-area section-padding">
     <div class="container">
-        <div class="row">
-            <div class="col-xl-12 mb-30">
-                <form action="/search" method="get" class="form-box" style="max-width: 520px;">
-                    <input type="text" name="q" class="auto-dir" placeholder="جستجوی کتاب..." value="{{ query }}">
-                    <div class="search-icon">
-                        <button type="submit" style="border:0;background:transparent;cursor:pointer;"><i class="ti-search"></i></button>
-                    </div>
-                </form>
-            </div>
+        <div class="listing-search-wrap">
+            <form action="/search" method="get" class="listing-search-form" role="search">
+                <input type="text"
+                       name="q"
+                       class="auto-dir"
+                       placeholder="جستجوی کتاب، نویسنده یا ناشر..."
+                       value="{{ query }}"
+                       autocomplete="off"
+                       aria-label="جستجوی کتاب">
+                <button type="submit" class="listing-search-btn" aria-label="جستجو">
+                    <i class="ti-search"></i>
+                    <span>جستجو</span>
+                </button>
+            </form>
         </div>
+
         {# Original kabana/categories.html wraps the grid in .best-selling #}
         <div class="best-selling p-0">
             <div class="row">
@@ -41,8 +49,20 @@
                         {{ book_card(book) }}
                     </div>
                 {% else %}
-                    <div class="col-12 text-center py-5">
-                        <p>نتیجه‌ای یافت نشد.</p>
+                    <div class="col-12">
+                        <div class="catalog-empty">
+                            <div class="catalog-empty-icon" aria-hidden="true">
+                                <i class="fas fa-search"></i>
+                            </div>
+                            {% if query %}
+                            <h3>نتیجه‌ای یافت نشد</h3>
+                            <p>برای «{{ query }}» چیزی پیدا نشد. املا را بررسی کنید یا عبارت کوتاه‌تری امتحان کنید.</p>
+                            {% else %}
+                            <h3>آماده جستجو</h3>
+                            <p>عبارت مورد نظر را در کادر بالا بنویسید تا کتاب‌ها نمایش داده شوند.</p>
+                            {% endif %}
+                            <a href="/" class="btn">بازگشت به صفحه اصلی</a>
+                        </div>
                     </div>
                 {% endfor %}
             </div>

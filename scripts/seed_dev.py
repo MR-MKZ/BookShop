@@ -23,7 +23,7 @@ from app.config import settings  # noqa: E402
 from app.models import Book, User, UserRole  # noqa: E402
 
 BACKUP_DB = ROOT / "books_data_backup.db"
-DEFAULT_ADMIN_PHONE = "09153276607"
+DEFAULT_ADMIN_PHONE = "09120000000"
 DEFAULT_ADMIN_PASSWORD = "admin123"
 DEFAULT_ADMIN_FIRST_NAME = "مدیر"
 DEFAULT_ADMIN_LAST_NAME = "سیستم"

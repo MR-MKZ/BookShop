@@ -7,11 +7,20 @@
            href="{{ action_url }}?range={{ p.key }}">{{ p.label }}</a>
         {% endfor %}
     </div>
-    <form class="filters range-custom" method="get" action="{{ action_url }}">
+    <form class="range-custom" method="get" action="{{ action_url }}">
         <input type="hidden" name="range" value="custom">
-        <label>از <input type="date" name="date_from" value="{{ date_from }}" required></label>
-        <label>تا <input type="date" name="date_to" value="{{ date_to }}" required></label>
-        <button class="btn" type="submit">اعمال بازه سفارشی</button>
+        <div class="range-field">
+            <label for="chart-date-from">از تاریخ</label>
+            <input id="chart-date-from" type="date" name="date_from" value="{{ date_from }}" required>
+        </div>
+        <div class="range-field">
+            <label for="chart-date-to">تا تاریخ</label>
+            <input id="chart-date-to" type="date" name="date_to" value="{{ date_to }}" required>
+        </div>
+        <div class="range-field range-field-action">
+            <label class="range-field-spacer" aria-hidden="true">&nbsp;</label>
+            <button class="btn range-apply-btn" type="submit">اعمال بازه</button>
+        </div>
     </form>
 </div>
 {%- endmacro %}

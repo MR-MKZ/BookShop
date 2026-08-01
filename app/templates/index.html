@@ -67,8 +67,15 @@
                     {{ book_card(book) }}
                 </div>
             {% else %}
-                <div class="col-12 text-center">
-                    <p>هنوز کتابی ثبت نشده است.</p>
+                <div class="col-12">
+                    <div class="catalog-empty">
+                        <div class="catalog-empty-icon" aria-hidden="true">
+                            <i class="fas fa-book"></i>
+                        </div>
+                        <h3>هنوز کتابی ثبت نشده است</h3>
+                        <p>به‌زودی عناوین جدید اضافه می‌شوند. می‌توانید بعداً سر بزنید یا در بخش ادمین کتاب‌ها را وارد کنید.</p>
+                        <a href="/search" class="btn">مشاهده همه کتاب‌ها</a>
+                    </div>
                 </div>
             {% endfor %}
         </div>

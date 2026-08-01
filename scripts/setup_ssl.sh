@@ -153,6 +153,80 @@ issue_with_webroot() {
     "${extra[@]}"
 }
 
+# Existing certs may have been issued with --standalone; renew would then fight nginx for :80.
+fix_renewal_to_webroot() {
+  local conf="/etc/letsencrypt/renewal/${DOMAIN_NAME}.conf"
+  if [[ ! -f "$conf" ]]; then
+    echo "No renewal config at $conf (will appear after first successful issue)" >&2
+    return 0
+  fi
+
+  echo "Ensuring renew uses webroot (not standalone) → $WEBROOT"
+
+  if certbot reconfigure --help >/dev/null 2>&1; then
+    certbot reconfigure \
+      --cert-name "$DOMAIN_NAME" \
+      --webroot \
+      -w "$WEBROOT" \
+      --non-interactive 2>/dev/null \
+      || true
+  fi
+
+  # Always patch renewal conf so cron/timer never bind :80
+  local tmp
+  tmp="$(mktemp)"
+  awk -v wr="$WEBROOT" -v dom="$DOMAIN_NAME" '
+    BEGIN { in_params=0; in_map=0; saw_auth=0; saw_path=0; saw_map=0 }
+    /^\[renewalparams\]/ { in_params=1; in_map=0; print; next }
+    /^\[\[webroot_map\]\]/ { in_map=1; in_params=0; saw_map=1; print; next }
+    /^\[/ {
+      if (in_params) {
+        if (!saw_auth) print "authenticator = webroot"
+        if (!saw_path) print "webroot_path = " wr ","
+        if (!saw_map) {
+          print "[[webroot_map]]"
+          print dom " = " wr
+          saw_map=1
+        }
+      }
+      in_params=0; in_map=0; print; next
+    }
+    in_params && /^authenticator[[:space:]]*=/ {
+      print "authenticator = webroot"; saw_auth=1; next
+    }
+    in_params && /^webroot_path[[:space:]]*=/ {
+      print "webroot_path = " wr ","; saw_path=1; next
+    }
+    in_map && $0 ~ ("^" dom "[[:space:]]*=") {
+      print dom " = " wr; next
+    }
+    { print }
+    END {
+      if (in_params) {
+        if (!saw_auth) print "authenticator = webroot"
+        if (!saw_path) print "webroot_path = " wr ","
+        if (!saw_map) {
+          print "[[webroot_map]]"
+          print dom " = " wr
+        }
+      }
+    }
+  ' "$conf" >"$tmp"
+  mv "$tmp" "$conf"
+  chmod 644 "$conf"
+  echo "Renewal config → authenticator=webroot, webroot_path=$WEBROOT"
+}
+
+validate_renew_dry_run() {
+  echo "Validating renew pipeline (dry-run, webroot)..."
+  if certbot renew --cert-name "$DOMAIN_NAME" --dry-run; then
+    echo "Dry-run renew OK"
+    return 0
+  fi
+  echo "Warning: dry-run renew failed — check $WEBROOT and nginx ACME location" >&2
+  return 1
+}
+
 issue_with_standalone() {
   local extra=()
   [[ "$FORCE" -eq 1 ]] && extra+=(--force-renewal)
@@ -248,18 +322,17 @@ fi
 export DOMAIN_NAME
 "$ROOT/scripts/deploy_ssl_certs.sh"
 
+fix_renewal_to_webroot
+
 install_renewal_hook
 ensure_timer_or_cron
 
-echo "Validating renew pipeline (dry-run)..."
-certbot renew --dry-run || {
-  echo "Warning: dry-run renew reported issues — check DNS / ACME webroot" >&2
-}
+validate_renew_dry_run || true
 
 echo
 echo "Done."
 echo "  Certs: $SSL_DIR/server.crt + server.key"
-echo "  Renew: certbot.timer / cron → deploy hook → reload kabana_nginx"
+echo "  Renew: certbot.timer / cron → webroot (nginx stays up) → deploy hook"
 echo "  Set BASE_URL=https://${DOMAIN_NAME} and ZIBAL_CALLBACK_URL accordingly"
 echo
 echo "Redeploy web so proxy headers fix https asset URLs:"
