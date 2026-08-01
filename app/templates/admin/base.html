@@ -375,21 +375,45 @@
                 bottom: 0;
                 width: min(280px, 86vw);
                 z-index: 50;
-                padding-top: 12px;
+                padding-top: calc(12px + env(safe-area-inset-top, 0px));
                 transform: translateX(105%);
                 transition: transform .25s ease;
                 overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
                 box-shadow: -4px 0 24px rgba(0,0,0,.25);
             }
             body.nav-open .sidebar { transform: translateX(0); }
             body.nav-open .sidebar-backdrop { display: block; }
             body.nav-open { overflow: hidden; }
-            .sidebar .brand { display: none; }
-            .main { padding: 16px 12px 28px; }
-            h1 { font-size: 1.25rem; }
+            .sidebar .brand {
+                display: block;
+                padding-top: 8px;
+                font-size: 1rem;
+            }
+            .sidebar a {
+                padding: 14px 20px;
+                font-size: .95rem;
+            }
+            .main {
+                padding: 14px 12px calc(28px + env(safe-area-inset-bottom, 0px));
+            }
+            h1 { font-size: 1.2rem; }
+            h2 { font-size: 1.05rem; }
+            .cards {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 10px;
+            }
+            .card { padding: 12px; }
+            .card .num { font-size: 1.2rem; }
             th, td { padding: 8px 10px; font-size: .82rem; }
             .filters { gap: 8px; }
-            .filters .btn { flex: 0 0 auto; }
+            .filters .btn { flex: 0 0 auto; width: 100%; }
+            .filters input[type="text"],
+            .filters input:not([type]),
+            .filters select {
+                flex: 1 1 100%;
+                max-width: 100%;
+            }
             .admin-form { padding: 16px; }
             .admin-form .form-grid { grid-template-columns: 1fr; }
             .list-upload-form {
@@ -400,11 +424,43 @@
                 margin-top: 6px;
             }
             .list-upload-form input[type="file"] { max-width: 100%; font-size: .75rem; }
-            .charts-grid { grid-template-columns: 1fr; }
-            .chart-wrap, .chart-wrap-bar { height: 260px; }
-            .range-field { max-width: 100%; flex: 1 1 100%; }
+            .charts-grid { grid-template-columns: 1fr; gap: 12px; }
+            .chart-card { padding: 12px; }
+            .chart-wrap { height: 220px; }
+            .chart-wrap-bar { height: 260px; }
+            .range-custom {
+                padding: 12px;
+                gap: 10px;
+            }
+            .range-field {
+                max-width: 100%;
+                flex: 1 1 100%;
+                min-width: 0;
+            }
+            .range-field-spacer { display: none; }
             .range-field-action { width: 100%; }
             .range-apply-btn { width: 100%; }
+            .range-presets { gap: 6px; }
+            .range-chip {
+                padding: 8px 12px;
+                font-size: .8rem;
+            }
+            /* Prevent iOS zoom on focus */
+            input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+            select,
+            textarea {
+                font-size: 16px;
+            }
+            .btn-row .btn {
+                flex: 1 1 calc(50% - 8px);
+                min-width: 0;
+                white-space: normal;
+                text-align: center;
+            }
+        }
+        @media (max-width: 420px) {
+            .cards { grid-template-columns: 1fr 1fr; }
+            .btn-row .btn { flex: 1 1 100%; }
         }
     </style>
     {% block head %}{% endblock %}

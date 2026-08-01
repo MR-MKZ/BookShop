@@ -406,7 +406,7 @@
             padding: 16px 28px;
         }
 
-        /* Catalog / search empty states (same visual language as library-empty) */
+        /* Catalog / search empty states */
         .catalog-empty {
             text-align: center;
             max-width: 480px;
@@ -415,6 +415,11 @@
             background: #fff;
             border: 1px dashed #d5dee7;
             border-radius: 16px;
+        }
+        .catalog-empty--compact {
+            max-width: 420px;
+            margin: 12px auto 8px;
+            padding: 28px 22px;
         }
         .catalog-empty-icon {
             width: 72px;
@@ -428,11 +433,21 @@
             color: #00a4a6;
             font-size: 1.65rem;
         }
+        .catalog-empty--compact .catalog-empty-icon {
+            width: 56px;
+            height: 56px;
+            margin-bottom: 14px;
+            font-size: 1.25rem;
+        }
         .catalog-empty h3 {
             margin: 0 0 10px;
             font-size: 1.25rem;
             font-weight: 700;
             color: #232f55;
+        }
+        .catalog-empty--compact h3 {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
         }
         .catalog-empty p {
             margin: 0 0 22px;
@@ -440,80 +455,114 @@
             font-size: 0.98rem;
             line-height: 1.75;
         }
+        .catalog-empty--compact p {
+            margin-bottom: 16px;
+            font-size: 0.92rem;
+        }
         .catalog-empty .btn {
             padding: 14px 28px;
         }
-
-        /* Listing-page search (search results) — matches hero search chrome */
-        .listing-search-wrap {
-            margin-bottom: 28px;
+        .catalog-empty--compact .btn {
+            padding: 12px 22px;
         }
-        .listing-search-form {
+
+        /* Search listing: tight spacing + compact toolbar search (not a page hero) */
+        .search-listing-area {
+            padding-top: 28px !important;
+            padding-bottom: 36px !important;
+        }
+        .listing-toolbar {
             display: flex;
+            justify-content: flex-start;
+            margin-bottom: 20px;
+        }
+        .listing-search-compact {
+            display: inline-flex;
             align-items: stretch;
-            gap: 0;
-            max-width: 640px;
-            margin: 0 auto;
+            width: 100%;
+            max-width: 340px;
             background: #fff;
             border: 1px solid #d7e0ea;
-            border-radius: 999px;
+            border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
         }
-        .listing-search-form input[type="text"],
-        .listing-search-form input:not([type]) {
+        .listing-search-compact input {
             flex: 1;
             min-width: 0;
             border: 0 !important;
             outline: none;
             background: transparent;
-            padding: 14px 22px;
-            font-size: 1rem;
+            padding: 10px 14px;
+            font-size: 0.9rem;
             color: #1e293b;
             text-align: right;
         }
-        .listing-search-form input::placeholder {
+        .listing-search-compact input::placeholder {
             color: #94a3b8;
         }
-        .listing-search-btn {
+        .listing-search-compact-btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 8px;
+            width: 44px;
             border: 0;
+            background: #f1f5f9;
+            color: #475569;
+            cursor: pointer;
+            transition: background .15s ease, color .15s ease;
+        }
+        .listing-search-compact-btn:hover,
+        .listing-search-compact-btn:focus {
             background: #00a4a6;
             color: #fff;
-            padding: 0 22px;
-            min-width: 108px;
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background .2s ease;
-        }
-        .listing-search-btn:hover,
-        .listing-search-btn:focus {
-            background: #02787a;
-            color: #fff;
-        }
-        .listing-search-btn i {
-            font-size: 1rem;
         }
         @media (max-width: 575.98px) {
-            .listing-search-form {
-                border-radius: 14px;
-                flex-direction: column;
+            .listing-search-compact {
+                max-width: 100%;
             }
-            .listing-search-btn {
-                min-height: 48px;
-                width: 100%;
-                border-radius: 0 0 14px 14px;
+            .listing-search-compact input {
+                font-size: 16px; /* iOS: avoid zoom on focus */
+                padding: 11px 12px;
             }
             .catalog-empty {
                 padding: 36px 18px;
                 margin-top: 20px;
             }
+            .catalog-empty--compact {
+                margin-top: 8px;
+                padding: 24px 16px;
+            }
+            .search-listing-area {
+                padding-top: 16px !important;
+                padding-bottom: 24px !important;
+            }
+            .listing-toolbar {
+                margin-bottom: 14px;
+            }
+            .footer-contact-list li {
+                font-size: 0.88rem;
+            }
+            .footer-trust-slot {
+                width: 76px;
+                height: 84px;
+            }
+            .footer-wrappper .footer-area.footer-padding {
+                padding-top: 36px !important;
+            }
+            .slider-area .hero-caption2 h2 {
+                font-size: 1.45rem !important;
+            }
+            .slider-area .hero-caption2 p {
+                font-size: 0.9rem !important;
+            }
         }
         @media (max-width: 767.98px) {
+            .footer-trust-badges {
+                justify-content: flex-start;
+            }
+            .best-selling .section-tittle-row {
+                margin-bottom: 28px !important;
+            }
             .library-page .library-listing {
                 padding-top: 30px !important;
             }
@@ -1570,11 +1619,66 @@
         }
 
         .footer-wrappper .footer-area.footer-padding {
-            padding-top: 40px !important;
-            padding-bottom: 24px !important;
+            padding-top: 48px !important;
+            padding-bottom: 20px !important;
         }
         .footer-wrappper .single-footer-caption {
-            margin-bottom: 16px !important;
+            margin-bottom: 28px !important;
+        }
+        .footer-contact-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        .footer-contact-list li {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 12px !important;
+            color: #4b5563;
+            font-size: 0.92rem;
+            line-height: 1.6;
+        }
+        .footer-contact-list li i {
+            margin-top: 4px;
+            color: #00a4a6;
+            width: 16px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        .footer-contact-list a {
+            color: #4b5563 !important;
+        }
+        .footer-contact-list a:hover {
+            color: #00a4a6 !important;
+        }
+        .footer-trust-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .footer-trust-slot {
+            width: 88px;
+            height: 96px;
+            border: 1px dashed #cbd5e1;
+            border-radius: 10px;
+            background: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            text-align: center;
+            padding: 8px;
+        }
+        .footer-trust-label {
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: #475569;
+        }
+        .footer-trust-hint {
+            font-size: 0.7rem;
+            color: #94a3b8;
         }
 
         .password-field {
@@ -1725,14 +1829,78 @@
             <div class="footer-area footer-padding">
                 <div class="container">
                     <div class="row justify-content-between">
-                        <div class="col-xl-4 col-lg-5 col-md-6">
+                        <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6">
                             <div class="single-footer-caption mb-50">
-                                <div class="footer-logo mb-25">
-                                    <a href="/"><img src="/static/img/logo/logo2_footer.png" alt="کابانا"></a>
+                                <div class="single-footer-caption mb-30">
+                                    <div class="footer-logo mb-25">
+                                        <a href="/"><img src="/static/img/logo/logo2_footer.png" alt="کابانا"></a>
+                                    </div>
+                                    <div class="footer-tittle">
+                                        <div class="footer-pera">
+                                            <p>فروشگاه آنلاین کتاب دیجیتال کابانا — خرید امن و دانلود فوری پس از پرداخت.</p>
+                                        </div>
+                                    </div>
+                                    <div class="footer-social">
+                                        <a href="#" aria-label="اینستاگرام"><i class="fab fa-instagram"></i></a>
+                                        <a href="#" aria-label="تلگرام"><i class="fab fa-telegram"></i></a>
+                                        <a href="#" aria-label="لینکدین"><i class="fab fa-linkedin-in"></i></a>
+                                    </div>
                                 </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
+                            <div class="single-footer-caption mb-50">
                                 <div class="footer-tittle">
-                                    <div class="footer-pera">
-                                        <p>فروشگاه آنلاین کتاب دیجیتال کابانا — خرید امن و دانلود فوری</p>
+                                    <h4>راهنمای سایت</h4>
+                                    <ul>
+                                        <li><a href="/search">همه کتاب‌ها</a></li>
+                                        <li><a href="/cart">سبد خرید</a></li>
+                                        <li><a href="/orders/recover">بازیابی سفارش</a></li>
+                                        <li><a href="/auth/login">ورود</a></li>
+                                        <li><a href="/auth/register">ثبت‌نام</a></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6">
+                            <div class="single-footer-caption mb-50">
+                                <div class="footer-tittle">
+                                    <h4>تماس با ما</h4>
+                                    <ul class="footer-contact-list">
+                                        <li>
+                                            <i class="fas fa-phone-alt" aria-hidden="true"></i>
+                                            <a href="tel:+982191000000" dir="ltr">۰۲۱-۹۱۰۰۰۰۰۰</a>
+                                        </li>
+                                        <li>
+                                            <i class="fas fa-envelope" aria-hidden="true"></i>
+                                            <a href="mailto:support@example.com" dir="ltr">support@example.com</a>
+                                        </li>
+                                        <li>
+                                            <i class="fas fa-map-marker-alt" aria-hidden="true"></i>
+                                            <span>تهران، خیابان نمونه، پلاک ۱</span>
+                                        </li>
+                                        <li>
+                                            <i class="far fa-clock" aria-hidden="true"></i>
+                                            <span>پشتیبانی: همه‌روزه ۹ تا ۱۸</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-xl-3 col-lg-4 col-md-6 col-sm-6">
+                            <div class="single-footer-caption mb-50">
+                                <div class="footer-tittle">
+                                    <h4>نمادها و اعتماد</h4>
+                                    <div class="footer-trust-badges">
+                                        {# Placeholder until eNamad / Samandehi codes are available #}
+                                        <div class="footer-trust-slot" title="جایگاه اینماد">
+                                            <span class="footer-trust-label">اینماد</span>
+                                            <span class="footer-trust-hint">به‌زودی</span>
+                                        </div>
+                                        <div class="footer-trust-slot" title="جایگاه ساماندهی">
+                                            <span class="footer-trust-label">ساماندهی</span>
+                                            <span class="footer-trust-hint">به‌زودی</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

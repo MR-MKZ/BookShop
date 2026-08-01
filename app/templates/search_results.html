@@ -23,25 +23,23 @@
     </div>
 </div>
 
-<div class="listing-area section-padding">
+<div class="listing-area search-listing-area">
     <div class="container">
-        <div class="listing-search-wrap">
-            <form action="/search" method="get" class="listing-search-form" role="search">
+        <div class="listing-toolbar">
+            <form action="/search" method="get" class="listing-search-compact" role="search">
                 <input type="text"
                        name="q"
                        class="auto-dir"
-                       placeholder="جستجوی کتاب، نویسنده یا ناشر..."
+                       placeholder="جستجو در کتاب‌ها..."
                        value="{{ query }}"
                        autocomplete="off"
                        aria-label="جستجوی کتاب">
-                <button type="submit" class="listing-search-btn" aria-label="جستجو">
+                <button type="submit" class="listing-search-compact-btn" aria-label="جستجو">
                     <i class="ti-search"></i>
-                    <span>جستجو</span>
                 </button>
             </form>
         </div>
 
-        {# Original kabana/categories.html wraps the grid in .best-selling #}
         <div class="best-selling p-0">
             <div class="row">
                 {% for book in books %}
@@ -50,7 +48,7 @@
                     </div>
                 {% else %}
                     <div class="col-12">
-                        <div class="catalog-empty">
+                        <div class="catalog-empty catalog-empty--compact">
                             <div class="catalog-empty-icon" aria-hidden="true">
                                 <i class="fas fa-search"></i>
                             </div>
@@ -58,8 +56,8 @@
                             <h3>نتیجه‌ای یافت نشد</h3>
                             <p>برای «{{ query }}» چیزی پیدا نشد. املا را بررسی کنید یا عبارت کوتاه‌تری امتحان کنید.</p>
                             {% else %}
-                            <h3>آماده جستجو</h3>
-                            <p>عبارت مورد نظر را در کادر بالا بنویسید تا کتاب‌ها نمایش داده شوند.</p>
+                            <h3>عبارت جستجو را وارد کنید</h3>
+                            <p>از کادر بالا عنوان، نویسنده یا ناشر را جستجو کنید.</p>
                             {% endif %}
                             <a href="/" class="btn">بازگشت به صفحه اصلی</a>
                         </div>
