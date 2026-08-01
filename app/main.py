@@ -6,6 +6,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.config import settings
 from app.database import AsyncSessionLocal
@@ -26,6 +27,9 @@ app = FastAPI(
     redoc_url=_redoc,
     openapi_url=_openapi,
 )
+
+# Trust X-Forwarded-Proto/Host from nginx so url_for() emits https:// (no mixed content)
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 _cors_origins = [
     settings.BASE_URL.rstrip("/"),
@@ -87,6 +91,8 @@ templates_path = os.path.join(os.path.dirname(__file__), "templates")
 if not os.path.exists(templates_path):
     os.makedirs(templates_path)
 templates = Jinja2Templates(directory=templates_path)
+# Relative static helper (optional); templates mostly use /static/... paths directly
+templates.env.globals["static_url"] = lambda path: f"/static/{str(path).lstrip('/')}"
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(store.router, tags=["store"])

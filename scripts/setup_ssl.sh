@@ -3,17 +3,19 @@
 # as nginx/ssl/server.{crt,key}. Configures certbot auto-renewal with a
 # deploy hook so certificates are refreshed before expiry.
 #
-# Run on the production server as root (or with sudo), from the project root:
+# Designed for Docker nginx holding :80/:443 — uses webroot only (never
+# fights nginx for port 80). Certbot writes into nginx/certbot-www; nginx
+# serves /.well-known/acme-challenge/ from that folder.
+#
+# Run on the production server as root, from the project root:
 #
 #   sudo ./scripts/setup_ssl.sh
-#   sudo ./scripts/setup_ssl.sh --force   # re-issue even if cert exists
-#   sudo DOMAIN_NAME=shop.example.com SSL_EMAIL=ops@example.com ./scripts/setup_ssl.sh
+#   sudo ./scripts/setup_ssl.sh --force
 #
 # Prerequisites:
+#   - DOMAIN_NAME + SSL_EMAIL in .env
 #   - DNS A/AAAA for DOMAIN_NAME → this server
-#   - Ports 80 and 443 reachable from the internet
-#   - docker compose prod stack (or at least port 80 free for first issue)
-#   - apt packages: certbot (script can install)
+#   - docker compose prod stack (nginx must be up for HTTP-01)
 
 set -euo pipefail
 
@@ -22,12 +24,14 @@ SSL_DIR="${SSL_DIR:-$ROOT/nginx/ssl}"
 WEBROOT="${CERTBOT_WEBROOT:-$ROOT/nginx/certbot-www}"
 COMPOSE_FILE="${COMPOSE_FILE:-$ROOT/docker-compose.yml}"
 FORCE=0
+USE_STANDALONE=0
 
 for arg in "$@"; do
   case "$arg" in
     --force) FORCE=1 ;;
+    --standalone) USE_STANDALONE=1 ;;
     -h|--help)
-      sed -n '2,20p' "$0"
+      sed -n '2,22p' "$0"
       exit 0
       ;;
     *)
@@ -43,7 +47,6 @@ load_env() {
     echo "Missing $env_file — copy .env.example and set DOMAIN_NAME / SSL_EMAIL" >&2
     exit 1
   fi
-  # shellcheck disable=SC1090
   set -a
   # shellcheck disable=SC1091
   source <(grep -E '^(DOMAIN_NAME|SSL_EMAIL|BASE_URL)=' "$env_file" | sed 's/\r$//')
@@ -74,12 +77,65 @@ ensure_certbot() {
 }
 
 ensure_dirs() {
-  mkdir -p "$SSL_DIR" "$WEBROOT"
+  mkdir -p "$SSL_DIR" "$WEBROOT/.well-known/acme-challenge"
   chmod 755 "$WEBROOT"
 }
 
 nginx_running() {
-  docker ps --format '{{.Names}}' 2>/dev/null | grep -qx 'kabana_nginx'
+  command -v docker >/dev/null 2>&1 \
+    && docker ps --format '{{.Names}}' 2>/dev/null | grep -qx 'kabana_nginx'
+}
+
+ensure_placeholder_certs() {
+  # nginx refuses to start without these files — keep a self-signed placeholder
+  # until Let's Encrypt replaces them.
+  if [[ -f "$SSL_DIR/server.crt" && -f "$SSL_DIR/server.key" ]]; then
+    return
+  fi
+  echo "Creating temporary self-signed certs so nginx can listen on :80/:443..."
+  mkdir -p "$SSL_DIR"
+  openssl req -x509 -nodes -days 3 -newkey rsa:2048 \
+    -keyout "$SSL_DIR/server.key" \
+    -out "$SSL_DIR/server.crt" \
+    -subj "/CN=${DOMAIN_NAME}" >/dev/null 2>&1
+  chmod 600 "$SSL_DIR/server.key"
+  chmod 644 "$SSL_DIR/server.crt"
+}
+
+ensure_nginx_up() {
+  ensure_placeholder_certs
+  if nginx_running; then
+    return
+  fi
+  echo "Starting nginx (prod profile) for ACME webroot..."
+  (cd "$ROOT" && docker compose --profile prod up -d nginx)
+  sleep 2
+  if ! nginx_running; then
+    echo "kabana_nginx is not running. Start the prod stack first:" >&2
+    echo "  docker compose --profile prod up -d" >&2
+    exit 1
+  fi
+}
+
+probe_acme_webroot() {
+  local token="kabana-acme-probe-$$"
+  local file="$WEBROOT/.well-known/acme-challenge/${token}"
+  echo "ok" >"$file"
+  chmod 644 "$file"
+
+  local code
+  code="$(curl -sS -o /dev/null -w '%{http_code}' \
+    --connect-timeout 5 --max-time 15 \
+    "http://${DOMAIN_NAME}/.well-known/acme-challenge/${token}" || true)"
+  rm -f "$file"
+
+  if [[ "$code" != "200" ]]; then
+    echo "ACME webroot probe failed (HTTP ${code:-none}) for" >&2
+    echo "  http://${DOMAIN_NAME}/.well-known/acme-challenge/..." >&2
+    echo "Check: DNS → this host, nginx certbot-www volume, firewall :80" >&2
+    return 1
+  fi
+  echo "ACME webroot OK (nginx serves challenges on :80)"
 }
 
 issue_with_webroot() {
@@ -101,7 +157,7 @@ issue_with_standalone() {
   local extra=()
   [[ "$FORCE" -eq 1 ]] && extra+=(--force-renewal)
 
-  echo "Nginx not up / webroot failed — using standalone (binds :80 briefly)..."
+  echo "Stopping kabana_nginx briefly so certbot can bind :80 (--standalone)..."
   if nginx_running; then
     (cd "$ROOT" && docker compose --profile prod stop nginx) || true
   fi
@@ -116,9 +172,7 @@ issue_with_standalone() {
     --keep-until-expiring \
     "${extra[@]}"
 
-  if [[ -f "$COMPOSE_FILE" ]]; then
-    (cd "$ROOT" && docker compose --profile prod up -d nginx) || true
-  fi
+  (cd "$ROOT" && docker compose --profile prod up -d nginx) || true
 }
 
 install_renewal_hook() {
@@ -139,7 +193,6 @@ EOF
 }
 
 ensure_timer_or_cron() {
-  # Prefer systemd timer shipped with certbot packages
   if command -v systemctl >/dev/null 2>&1; then
     if systemctl list-unit-files 2>/dev/null | grep -q '^certbot.timer'; then
       systemctl enable --now certbot.timer
@@ -149,7 +202,6 @@ ensure_timer_or_cron() {
     fi
   fi
 
-  # Fallback twice-daily cron (certbot only renews when near expiry)
   local cron_file="/etc/cron.d/kabana-certbot-renew"
   cat >"$cron_file" <<EOF
 # Kabana BookShop — certbot renew (deploy hook copies into nginx/ssl)
@@ -182,17 +234,15 @@ ensure_dirs
 
 echo "Domain : $DOMAIN_NAME"
 echo "Email  : $SSL_EMAIL"
-echo "Webroot: $WEBROOT"
+echo "Webroot: $WEBROOT  (nginx serves this — certbot does NOT bind :80)"
 echo "SSL dir: $SSL_DIR (server.crt / server.key)"
 
-# Prefer webroot when nginx is serving ACME path
-if nginx_running; then
-  if ! issue_with_webroot; then
-    echo "Webroot challenge failed; falling back to standalone..."
-    issue_with_standalone
-  fi
-else
+if [[ "$USE_STANDALONE" -eq 1 ]]; then
   issue_with_standalone
+else
+  ensure_nginx_up
+  probe_acme_webroot
+  issue_with_webroot
 fi
 
 export DOMAIN_NAME
@@ -201,16 +251,16 @@ export DOMAIN_NAME
 install_renewal_hook
 ensure_timer_or_cron
 
-# Dry-run renew to validate hook path (does not hit rate limits hard on success path)
 echo "Validating renew pipeline (dry-run)..."
 certbot renew --dry-run || {
-  echo "Warning: dry-run renew reported issues — check DNS / port 80 / nginx ACME location" >&2
+  echo "Warning: dry-run renew reported issues — check DNS / ACME webroot" >&2
 }
 
 echo
 echo "Done."
-echo "  Certs live at: $SSL_DIR/server.crt and $SSL_DIR/server.key"
-echo "  Auto-renew: certbot.timer or /etc/cron.d/kabana-certbot-renew"
-echo "  After renew, deploy hook runs scripts/deploy_ssl_certs.sh and reloads nginx"
+echo "  Certs: $SSL_DIR/server.crt + server.key"
+echo "  Renew: certbot.timer / cron → deploy hook → reload kabana_nginx"
+echo "  Set BASE_URL=https://${DOMAIN_NAME} and ZIBAL_CALLBACK_URL accordingly"
 echo
-echo "Remember BASE_URL / ZIBAL_CALLBACK_URL use https://${DOMAIN_NAME}/ ..."
+echo "Redeploy web so proxy headers fix https asset URLs:"
+echo "  docker compose --profile prod up -d --build web_prod"
