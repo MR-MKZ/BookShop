@@ -1,7 +1,7 @@
 import os
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
@@ -18,6 +18,7 @@ from app.database import get_async_db
 from app.models import User, UserRole
 from app.schemas import UserResponse
 from app.utils.phone import validate_iran_phone
+from app.utils.security import cookie_kwargs, safe_next_url
 
 router = APIRouter()
 
@@ -33,7 +34,7 @@ async def login_page(request: Request):
             "request": request,
             "error": None,
             "phone": "",
-            "next": request.query_params.get("next", "/"),
+            "next": safe_next_url(request.query_params.get("next"), "/"),
         },
     )
 
@@ -43,6 +44,7 @@ async def login(request: Request, db: AsyncSession = Depends(get_async_db)):
     form = await request.form()
     phone = form.get("phone") or form.get("username")
     password = form.get("password")
+    next_raw = form.get("next") or "/"
 
     ok, phone_or_err = validate_iran_phone(phone)
     if not ok:
@@ -52,7 +54,7 @@ async def login(request: Request, db: AsyncSession = Depends(get_async_db)):
                 "request": request,
                 "error": phone_or_err,
                 "phone": phone or "",
-                "next": form.get("next") or "/",
+                "next": safe_next_url(next_raw, "/"),
             },
         )
 
@@ -64,7 +66,7 @@ async def login(request: Request, db: AsyncSession = Depends(get_async_db)):
                 "request": request,
                 "error": "شماره تلفن یا رمز عبور اشتباه است",
                 "phone": phone_or_err,
-                "next": form.get("next") or "/",
+                "next": safe_next_url(next_raw, "/"),
             },
         )
 
@@ -75,7 +77,7 @@ async def login(request: Request, db: AsyncSession = Depends(get_async_db)):
                 "request": request,
                 "error": "حساب کاربری غیرفعال است",
                 "phone": phone_or_err,
-                "next": form.get("next") or "/",
+                "next": safe_next_url(next_raw, "/"),
             },
         )
 
@@ -83,16 +85,13 @@ async def login(request: Request, db: AsyncSession = Depends(get_async_db)):
         data={"sub": user.phone, "role": user.role.value},
         expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
     )
-    next_url = form.get("next") or "/"
-    if not str(next_url).startswith("/"):
-        next_url = "/"
+    next_url = safe_next_url(next_raw, "/")
 
     response = RedirectResponse(url=next_url, status_code=status.HTTP_303_SEE_OTHER)
     response.set_cookie(
         key="access_token",
         value=f"Bearer {access_token}",
-        httponly=True,
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        **cookie_kwargs(max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60),
     )
     return response
 
@@ -178,8 +177,7 @@ async def register(request: Request, db: AsyncSession = Depends(get_async_db)):
     response.set_cookie(
         key="access_token",
         value=f"Bearer {access_token}",
-        httponly=True,
-        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        **cookie_kwargs(max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60),
     )
     return response
 

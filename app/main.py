@@ -7,22 +7,38 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.config import settings
 from app.database import AsyncSessionLocal
-from app.routers import admin, auth, cart, media, payment, store
+from app.routers import admin, auth, cart, checkout, media, payment, store
 from app.routers.admin import AdminAuthRedirect
 from app.routers.cart import cart_count_for_request
+from app.utils.security import safe_next_url
+
+_docs = None if settings.is_production else "/docs"
+_redoc = None if settings.is_production else "/redoc"
+_openapi = None if settings.is_production else "/openapi.json"
 
 app = FastAPI(
     title="Kabana Book Store",
     description="Digital Book Store",
     version="1.0.0",
+    docs_url=_docs,
+    redoc_url=_redoc,
+    openapi_url=_openapi,
 )
 
+_cors_origins = [
+    settings.BASE_URL.rstrip("/"),
+    f"https://{settings.DOMAIN_NAME}",
+    f"http://{settings.DOMAIN_NAME}",
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=sorted({o for o in _cors_origins if o}),
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -36,7 +52,7 @@ class CartCountMiddleware(BaseHTTPMiddleware):
                 try:
                     from jose import jwt
                     from sqlalchemy import select
-                    from app.config import settings
+
                     from app.models import User
 
                     token = None
@@ -75,6 +91,7 @@ templates = Jinja2Templates(directory=templates_path)
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(store.router, tags=["store"])
 app.include_router(cart.router, tags=["cart"])
+app.include_router(checkout.router, tags=["checkout"])
 app.include_router(payment.router, tags=["payment"])
 app.include_router(media.router, tags=["media"])
 app.include_router(admin.router, tags=["admin"])
@@ -82,8 +99,9 @@ app.include_router(admin.router, tags=["admin"])
 
 @app.exception_handler(AdminAuthRedirect)
 async def admin_auth_redirect_handler(request: Request, exc: AdminAuthRedirect):
+    next_path = safe_next_url(exc.next_path, "/admin/")
     return RedirectResponse(
-        url=f"/auth/login?next={exc.next_path}",
+        url=f"/auth/login?next={next_path}",
         status_code=303,
     )
 
