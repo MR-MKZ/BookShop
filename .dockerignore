@@ -1,9 +1,33 @@
+# Secrets & local env — never bake into images
+.env
+.env.*
+!.env.example
+
+# VCS / IDE / caches
+.git/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ruff_cache/
+.cursor/
+.idea/
+.vscode/
+
+# Runtime / local data
 storage/
 postgres_data/
-nginx/ssl/
-__pycache__/
-.venv/
-.git/
-alembic/versions/
-books_data.db
+ftp_data/
+media/
+*.db
+*.log
+books_data_backup.db
 scraper.log
+
+# Legacy / reference not needed in images
+scraper.py
+kabana/
+nginx/ssl/
+
+# Tests (optional in runtime image)
+tests/

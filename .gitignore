@@ -2,6 +2,9 @@ storage/
 media/
 postgres_data/
 ftp_data/
+nginx/ssl/*.key
+nginx/ssl/*.crt
+nginx/ssl/*.pem
 
 .idea/
 .vscode/
@@ -14,3 +17,7 @@ __pycache__/
 *.pyd
 .env
 .ruff_cache
+*.log
+*.db
+books_data_backup.db
+scraper.log
