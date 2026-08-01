@@ -22,6 +22,7 @@ from app.models import (
 )
 from app.services.checkout_helpers import get_download_ttl_seconds
 from app.services.downloads import download_url, make_download_token
+from app.utils.price import format_price, round_toman
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -43,17 +44,9 @@ async def _download_token_for(
     )
 
 
-def _format_price(value) -> str:
-    if value is None:
-        return "۰"
-    try:
-        return f"{float(value):,.0f}"
-    except (TypeError, ValueError):
-        return str(value)
-
-
 templates.env.globals["cover_url"] = _cover_url
-templates.env.globals["format_price"] = _format_price
+templates.env.globals["format_price"] = format_price
+templates.env.globals["round_toman"] = round_toman
 
 
 @router.get("/")

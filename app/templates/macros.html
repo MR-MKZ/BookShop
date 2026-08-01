@@ -1,10 +1,12 @@
 {% macro dual_price(book) -%}
 <div class="price price-dual">
-    {% if book.original_price and book.price and book.original_price > book.price %}
-        <span class="old-price">{{ "{:,.0f}".format(book.original_price|float) }} تومان</span>
-        <span class="sale-price">{{ "{:,.0f}".format(book.price|float) }} تومان</span>
-    {% elif book.price %}
-        <span class="sale-price">{{ "{:,.0f}".format(book.price|float) }} تومان</span>
+    {% set sale = round_toman(book.price) %}
+    {% set orig = round_toman(book.original_price) if book.original_price else none %}
+    {% if orig and sale and orig > sale %}
+        <span class="old-price">{{ format_price(orig) }} تومان</span>
+        <span class="sale-price">{{ format_price(sale) }} تومان</span>
+    {% elif sale %}
+        <span class="sale-price">{{ format_price(sale) }} تومان</span>
     {% else %}
         <span class="sale-price">رایگان</span>
     {% endif %}

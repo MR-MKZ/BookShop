@@ -43,6 +43,7 @@ from app.services.checkout_helpers import (
     ORDER_ACCESS_COOKIE_MAX_AGE,
     compute_discount,
     find_valid_coupon,
+
     get_download_ttl_hours,
     get_download_ttl_seconds,
     new_order_access_token,
@@ -51,22 +52,14 @@ from app.services.checkout_helpers import (
 from app.services.downloads import download_url, make_download_token
 from app.services.payments import PaymentError, get_gateway, list_gateways
 from app.utils.phone import normalize_iran_phone, validate_iran_phone
+from app.utils.price import format_price, round_toman
 from app.utils.security import cookie_kwargs
 
 router = APIRouter(tags=["checkout"])
 templates = Jinja2Templates(directory="app/templates")
 
-
-def _format_price(value) -> str:
-    if value is None:
-        return "۰"
-    try:
-        return f"{float(value):,.0f}"
-    except (TypeError, ValueError):
-        return str(value)
-
-
-templates.env.globals["format_price"] = _format_price
+templates.env.globals["format_price"] = format_price
+templates.env.globals["round_toman"] = round_toman
 
 
 def _set_order_access_cookie(response: RedirectResponse, token: str) -> None:
@@ -111,7 +104,7 @@ async def _checkout_context(
 ):
     sid = _cart_session_id(request)
     books = await _books_for_checkout(db, current_user, sid)
-    subtotal = sum(Decimal(str(b.price or 0)) for b in books)
+    subtotal = sum(round_toman(b.price) for b in books)
 
     coupon_code = request.cookies.get(COUPON_COOKIE) or ""
     if form_data and form_data.get("coupon_code") is not None:
@@ -192,7 +185,7 @@ async def apply_coupon(
 
     sid = _cart_session_id(request)
     books = await _books_for_checkout(db, current_user, sid)
-    subtotal = sum(Decimal(str(b.price or 0)) for b in books)
+    subtotal = sum(round_toman(b.price) for b in books)
     coupon, err = await find_valid_coupon(db, coupon_code, subtotal)
     await db.commit()
 
@@ -253,7 +246,7 @@ async def place_order(
 
     sid = _cart_session_id(request)
     books_early = await _books_for_checkout(db, current_user, sid)
-    subtotal_early = sum(Decimal(str(b.price or 0)) for b in books_early)
+    subtotal_early = sum(round_toman(b.price) for b in books_early)
     code = (coupon_code or request.cookies.get(COUPON_COOKIE) or "").strip()
     coupon, coupon_err = await find_valid_coupon(db, code, subtotal_early)
     # Stale / exhausted / invalid codes must not block checkout — ignore until a new valid code is applied
@@ -373,7 +366,7 @@ async def place_order(
             OrderItem(
                 order_id=order.id,
                 book_id=book.id,
-                price=book.price or 0,
+                price=round_toman(book.price),
                 quantity=1,
             )
         )

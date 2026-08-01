@@ -53,10 +53,14 @@ def make_folder_name(title: str, url: str) -> str:
 
 
 def apply_dual_pricing(raw_price: Decimal) -> tuple[Decimal, Decimal]:
-    """Sale price 2-3k below source; original 30-40k above sale."""
+    """Sale price 2-3k below source; original 30-40k above sale. Rounded to thousands."""
+    from app.utils.price import round_toman
+
     discount = Decimal(random.randint(2000, 3000))
-    price = max(Decimal("0"), raw_price - discount)
-    original = price + Decimal(random.randint(30000, 40000))
+    price = round_toman(max(Decimal("0"), raw_price - discount))
+    original = round_toman(price + Decimal(random.randint(30000, 40000)))
+    if original <= price and price > 0:
+        original = price + Decimal("35000")
     return price, original
 
 

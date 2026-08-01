@@ -553,13 +553,17 @@ async def _resolve_stored_filename(book: Book) -> str | None:
 
 
 def _parse_price(price: str, original_price: str) -> tuple[Decimal, Decimal] | str:
+    from app.utils.price import round_toman
+
     try:
-        price_val = Decimal(price.replace(",", "") or "0")
+        price_val = round_toman(Decimal(price.replace(",", "") or "0"))
         orig_val = (
-            Decimal(original_price.replace(",", ""))
+            round_toman(Decimal(original_price.replace(",", "")))
             if original_price.strip()
             else price_val + Decimal("35000")
         )
+        if orig_val <= price_val and price_val > 0:
+            orig_val = price_val + Decimal("35000")
         return price_val, orig_val
     except InvalidOperation:
         return "قیمت نامعتبر است"

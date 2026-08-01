@@ -56,7 +56,7 @@
                             </td>
                             <td>
                                 <div class="cart-price" dir="ltr">
-                                    <span class="cart-price-amount">{{ "{:,.0f}".format(book.price|float) if book.price else 0 }}</span>
+                                    <span class="cart-price-amount">{{ format_price(book.price) }}</span>
                                     <span class="cart-price-currency">تومان</span>
                                 </div>
                             </td>
@@ -73,7 +73,7 @@
                             <td><h5>جمع کل</h5></td>
                             <td colspan="2">
                                 <div class="cart-price cart-price--total" dir="ltr">
-                                    <span class="cart-price-amount">{{ "{:,.0f}".format(total) }}</span>
+                                    <span class="cart-price-amount">{{ format_price(total) }}</span>
                                     <span class="cart-price-currency">تومان</span>
                                 </div>
                             </td>

@@ -542,10 +542,6 @@
             .footer-contact-list li {
                 font-size: 0.88rem;
             }
-            .footer-trust-slot {
-                width: 76px;
-                height: 84px;
-            }
             .footer-wrappper .footer-area.footer-padding {
                 padding-top: 36px !important;
             }
@@ -1655,30 +1651,13 @@
         .footer-trust-badges {
             display: flex;
             flex-wrap: wrap;
+            align-items: center;
             gap: 10px;
         }
-        .footer-trust-slot {
-            width: 88px;
-            height: 96px;
-            border: 1px dashed #cbd5e1;
-            border-radius: 10px;
-            background: #f8fafc;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            text-align: center;
-            padding: 8px;
-        }
-        .footer-trust-label {
-            font-size: 0.8rem;
-            font-weight: 700;
-            color: #475569;
-        }
-        .footer-trust-hint {
-            font-size: 0.7rem;
-            color: #94a3b8;
+        .footer-trust-badges img {
+            display: block;
+            max-width: 125px;
+            height: auto;
         }
 
         .password-field {
@@ -1892,15 +1871,15 @@
                                 <div class="footer-tittle">
                                     <h4>نمادها و اعتماد</h4>
                                     <div class="footer-trust-badges">
-                                        {# Placeholder until eNamad / Samandehi codes are available #}
-                                        <div class="footer-trust-slot" title="جایگاه اینماد">
-                                            <span class="footer-trust-label">اینماد</span>
-                                            <span class="footer-trust-hint">به‌زودی</span>
-                                        </div>
-                                        <div class="footer-trust-slot" title="جایگاه ساماندهی">
-                                            <span class="footer-trust-label">ساماندهی</span>
-                                            <span class="footer-trust-hint">به‌زودی</span>
-                                        </div>
+                                        <a referrerpolicy="origin" target="_blank" rel="noopener noreferrer"
+                                           href="https://trustseal.enamad.ir/?id=767600&Code=P7vTzJzCcmuodGIx9151qsFGvZjwqcUF">
+                                            <img referrerpolicy="origin"
+                                                 src="https://trustseal.enamad.ir/logo.aspx?id=767600&Code=P7vTzJzCcmuodGIx9151qsFGvZjwqcUF"
+                                                 alt="نماد اعتماد الکترونیکی"
+                                                 width="125" height="136"
+                                                 style="cursor:pointer"
+                                                 code="P7vTzJzCcmuodGIx9151qsFGvZjwqcUF">
+                                        </a>
                                     </div>
                                 </div>
                             </div>

@@ -13,10 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import get_current_user_optional
 from app.database import get_async_db
 from app.models import Book, Cart, Order, OrderItem, OrderStatus, User
+from app.utils.price import format_price, round_toman
 from app.utils.security import cookie_kwargs
 
 router = APIRouter(tags=["cart"])
 templates = Jinja2Templates(directory="app/templates")
+templates.env.globals["format_price"] = format_price
+templates.env.globals["round_toman"] = round_toman
 
 CART_COOKIE = "cart_sid"
 
@@ -100,7 +103,7 @@ async def view_cart(
 ):
     sid = _cart_session_id(request)
     items = await _load_cart_items(db, current_user, sid)
-    total = sum(float(book.price or 0) for _, book in items)
+    total = sum(float(round_toman(book.price)) for _, book in items)
 
     return templates.TemplateResponse(
         "cart.html",

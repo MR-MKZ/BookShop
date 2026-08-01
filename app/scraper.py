@@ -554,8 +554,11 @@ class BookScraper:
                         raw_price = 0.0
 
                     # Sale price 2–3k below source; strikethrough original 30–40k above sale
+                    # Round down to whole thousands so storefront prices stay clean.
                     sale_price = max(0.0, raw_price - random.randint(2000, 3000))
+                    sale_price = (int(sale_price) // 1000) * 1000
                     original_price = sale_price + random.randint(30000, 40000)
+                    original_price = (int(original_price) // 1000) * 1000
 
                     availability = get_meta("availability")
 
