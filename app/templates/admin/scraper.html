@@ -1,40 +1,20 @@
 {% extends "admin/base.html" %}
 {% block title %}وضعیت اسکرپر{% endblock %}
-{% block head %}
-<meta http-equiv="refresh" content="10">
-{% endblock %}
 {% block content %}
 <h1>وضعیت اسکرپر</h1>
-<p style="color:#64748b;">این صفحه هر ۱۰ ثانیه به‌روز می‌شود. اجرا با <code dir="ltr">docker compose --profile scraper up --build scraper</code></p>
+<p class="scraper-live-hint" style="color:#64748b;">
+    به‌روزرسانی زنده هر <span dir="ltr">5</span> ثانیه
+    <span id="scraper-live-dot" aria-hidden="true" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#94a3b8;margin-inline-start:8px;vertical-align:middle;"></span>
+    <button type="button" class="btn btn-sm btn-secondary" id="scraper-refresh-now" style="margin-inline-start:10px;">بروزرسانی</button>
+</p>
+<p style="color:#64748b;font-size:.9rem;">اجرا:
+    <code dir="ltr">docker compose --profile scraper up -d scraper</code>
+</p>
 
-{% if running %}
-<div class="card" style="margin-bottom:20px;border-right:4px solid #50b848;">
-    <h2 style="margin:0 0 8px;">در حال اجرا #{{ running.id }}</h2>
-    <p>شروع: <span dir="ltr">{{ running.started_at }}</span></p>
-    <p>حالت: {{ running.mode or '—' }}</p>
-    <p>صفحات: {{ running.pages_done or 0 }} / {{ running.pages_total or '?' }}</p>
-    <p>ذخیره‌شده: {{ running.books_saved or 0 }} — ردشده: {{ running.books_skipped or 0 }}</p>
-    {% if running.hostname %}<p>میزبان: <span dir="ltr">{{ running.hostname }}</span> (pid {{ running.pid }})</p>{% endif %}
-</div>
-{% elif latest %}
-<div class="card" style="margin-bottom:20px;">
-    <h2 style="margin:0 0 8px;">آخرین اجرا #{{ latest.id }}
-        {% if latest.status.value == 'COMPLETED' %}<span class="badge badge-ok">موفق</span>
-        {% elif latest.status.value == 'FAILED' %}<span class="badge badge-no">ناموفق</span>
-        {% else %}<span class="badge">{{ latest.status.value }}</span>{% endif %}
-    </h2>
-    <p>شروع: <span dir="ltr">{{ latest.started_at }}</span>
-       {% if latest.finished_at %} — پایان: <span dir="ltr">{{ latest.finished_at }}</span>{% endif %}</p>
-    <p>حالت: {{ latest.mode or '—' }}</p>
-    <p>صفحات: {{ latest.pages_done or 0 }} / {{ latest.pages_total or '?' }}</p>
-    <p>ذخیره‌شده: {{ latest.books_saved or 0 }} — ردشده: {{ latest.books_skipped or 0 }}</p>
-    {% if latest.error_message %}<p style="color:#dc2626;">خطا: {{ latest.error_message }}</p>{% endif %}
-</div>
-{% else %}
-<div class="msg" style="background:#f1f5f9;color:#475569;">هنوز اجرایی ثبت نشده است.</div>
-{% endif %}
+<div id="scraper-summary"></div>
 
 <h2>تاریخچه</h2>
+<div class="table-wrap">
 <table>
     <thead>
         <tr>
@@ -48,25 +28,163 @@
             <th>پایان</th>
         </tr>
     </thead>
-    <tbody>
-        {% for run in runs %}
-        <tr>
-            <td>{{ run.id }}</td>
-            <td>
-                {% if run.status.value == 'RUNNING' %}<span class="badge" style="background:#bfdbfe;">RUNNING</span>
-                {% elif run.status.value == 'COMPLETED' %}<span class="badge badge-ok">COMPLETED</span>
-                {% else %}<span class="badge badge-no">FAILED</span>{% endif %}
-            </td>
-            <td>{{ run.mode or '—' }}</td>
-            <td dir="ltr">{{ run.pages_done or 0 }}/{{ run.pages_total or '?' }}</td>
-            <td>{{ run.books_saved or 0 }}</td>
-            <td>{{ run.books_skipped or 0 }}</td>
-            <td dir="ltr">{{ run.started_at }}</td>
-            <td dir="ltr">{{ run.finished_at or '—' }}</td>
-        </tr>
-        {% else %}
-        <tr><td colspan="8">موردی نیست</td></tr>
-        {% endfor %}
+    <tbody id="scraper-runs-body">
+        <tr><td colspan="8">در حال بارگذاری…</td></tr>
     </tbody>
 </table>
+</div>
+
+<script type="application/json" id="scraper-initial-data">{{ initial_status | tojson }}</script>
+<script>
+(function () {
+    var POLL_MS = 5000;
+    var summaryEl = document.getElementById('scraper-summary');
+    var bodyEl = document.getElementById('scraper-runs-body');
+    var dotEl = document.getElementById('scraper-live-dot');
+    var btn = document.getElementById('scraper-refresh-now');
+    var timer = null;
+    var inFlight = false;
+
+    function esc(s) {
+        if (s == null || s === '') return '';
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function fmtTs(iso) {
+        if (!iso) return '—';
+        try {
+            return new Date(iso).toLocaleString('fa-IR');
+        } catch (e) {
+            return iso;
+        }
+    }
+
+    function statusBadge(status) {
+        if (status === 'RUNNING') {
+            return '<span class="badge" style="background:#bfdbfe;">RUNNING</span>';
+        }
+        if (status === 'COMPLETED') {
+            return '<span class="badge badge-ok">COMPLETED</span>';
+        }
+        if (status === 'FAILED') {
+            return '<span class="badge badge-no">FAILED</span>';
+        }
+        return '<span class="badge">' + esc(status || '—') + '</span>';
+    }
+
+    function renderSummary(data) {
+        var run = data.running || null;
+        var latest = data.latest || null;
+        if (run) {
+            summaryEl.innerHTML =
+                '<div class="card" style="margin-bottom:20px;border-right:4px solid #50b848;">' +
+                '<h2 style="margin:0 0 8px;">در حال اجرا #' + esc(run.id) + '</h2>' +
+                '<p>شروع: <span dir="ltr">' + esc(fmtTs(run.started_at)) + '</span></p>' +
+                '<p>حالت: ' + esc(run.mode || '—') + '</p>' +
+                '<p>صفحات: ' + esc(run.pages_done) + ' / ' + esc(run.pages_total || '?') + '</p>' +
+                '<p>ذخیره‌شده: ' + esc(run.books_saved) + ' — ردشده: ' + esc(run.books_skipped) + '</p>' +
+                (run.hostname
+                    ? '<p>میزبان: <span dir="ltr">' + esc(run.hostname) + '</span> (pid ' + esc(run.pid) + ')</p>'
+                    : '') +
+                '</div>';
+            return;
+        }
+        if (latest) {
+            var badge =
+                latest.status === 'COMPLETED' ? '<span class="badge badge-ok">موفق</span>' :
+                latest.status === 'FAILED' ? '<span class="badge badge-no">ناموفق</span>' :
+                '<span class="badge">' + esc(latest.status) + '</span>';
+            summaryEl.innerHTML =
+                '<div class="card" style="margin-bottom:20px;">' +
+                '<h2 style="margin:0 0 8px;">آخرین اجرا #' + esc(latest.id) + ' ' + badge + '</h2>' +
+                '<p>شروع: <span dir="ltr">' + esc(fmtTs(latest.started_at)) + '</span>' +
+                (latest.finished_at
+                    ? ' — پایان: <span dir="ltr">' + esc(fmtTs(latest.finished_at)) + '</span>'
+                    : '') +
+                '</p>' +
+                '<p>حالت: ' + esc(latest.mode || '—') + '</p>' +
+                '<p>صفحات: ' + esc(latest.pages_done) + ' / ' + esc(latest.pages_total || '?') + '</p>' +
+                '<p>ذخیره‌شده: ' + esc(latest.books_saved) + ' — ردشده: ' + esc(latest.books_skipped) + '</p>' +
+                (latest.error_message
+                    ? '<p style="color:#dc2626;">خطا: ' + esc(latest.error_message) + '</p>'
+                    : '') +
+                '</div>';
+            return;
+        }
+        summaryEl.innerHTML =
+            '<div class="msg" style="background:#f1f5f9;color:#475569;">هنوز اجرایی ثبت نشده است.</div>';
+    }
+
+    function renderRuns(runs) {
+        if (!runs || !runs.length) {
+            bodyEl.innerHTML = '<tr><td colspan="8">موردی نیست</td></tr>';
+            return;
+        }
+        bodyEl.innerHTML = runs.map(function (run) {
+            return '<tr>' +
+                '<td>' + esc(run.id) + '</td>' +
+                '<td>' + statusBadge(run.status) + '</td>' +
+                '<td>' + esc(run.mode || '—') + '</td>' +
+                '<td dir="ltr">' + esc(run.pages_done) + '/' + esc(run.pages_total || '?') + '</td>' +
+                '<td>' + esc(run.books_saved) + '</td>' +
+                '<td>' + esc(run.books_skipped) + '</td>' +
+                '<td dir="ltr">' + esc(fmtTs(run.started_at)) + '</td>' +
+                '<td dir="ltr">' + esc(fmtTs(run.finished_at)) + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function apply(data) {
+        renderSummary(data);
+        renderRuns(data.runs || []);
+    }
+
+    function setDot(ok) {
+        if (!dotEl) return;
+        dotEl.style.background = ok ? '#22c55e' : '#ef4444';
+    }
+
+    function fetchStatus() {
+        if (inFlight) return;
+        inFlight = true;
+        fetch('/admin/scraper/status', {
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin',
+        })
+            .then(function (res) {
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                return res.json();
+            })
+            .then(function (data) {
+                apply(data);
+                setDot(true);
+            })
+            .catch(function () {
+                setDot(false);
+            })
+            .finally(function () {
+                inFlight = false;
+            });
+    }
+
+    function schedule() {
+        timer = window.setInterval(fetchStatus, POLL_MS);
+    }
+
+    try {
+        var initial = JSON.parse(document.getElementById('scraper-initial-data').textContent);
+        apply(initial);
+        setDot(true);
+    } catch (e) {
+        fetchStatus();
+    }
+
+    if (btn) btn.addEventListener('click', fetchStatus);
+    schedule();
+})();
+</script>
 {% endblock %}

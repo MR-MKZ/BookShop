@@ -1503,29 +1503,63 @@ async def admin_reports(
 # ---------------------------------------------------------------------------
 
 
+def _scraper_run_dict(run: ScraperRun) -> dict:
+    status = run.status.value if run.status else None
+    return {
+        "id": run.id,
+        "status": status,
+        "mode": run.mode,
+        "pages_total": run.pages_total or 0,
+        "pages_done": run.pages_done or 0,
+        "books_saved": run.books_saved or 0,
+        "books_skipped": run.books_skipped or 0,
+        "error_message": run.error_message,
+        "pid": run.pid,
+        "hostname": run.hostname,
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "finished_at": run.finished_at.isoformat() if run.finished_at else None,
+    }
+
+
+async def _scraper_status_payload(db: AsyncSession) -> dict:
+    result = await db.execute(
+        select(ScraperRun).order_by(desc(ScraperRun.started_at)).limit(50)
+    )
+    runs = list(result.scalars().all())
+    latest = runs[0] if runs else None
+    running = (
+        latest if latest and latest.status == ScraperRunStatus.RUNNING else None
+    )
+    return {
+        "running": _scraper_run_dict(running) if running else None,
+        "latest": _scraper_run_dict(latest) if latest else None,
+        "runs": [_scraper_run_dict(r) for r in runs],
+    }
+
+
 @router.get("/scraper", response_class=HTMLResponse)
 async def admin_scraper_status(
     request: Request,
     db: AsyncSession = Depends(get_async_db),
     admin: User = Depends(require_admin),
 ):
-    result = await db.execute(
-        select(ScraperRun).order_by(desc(ScraperRun.started_at)).limit(50)
-    )
-    runs = list(result.scalars().all())
-    latest = runs[0] if runs else None
-    running = latest if latest and latest.status == ScraperRunStatus.RUNNING else None
-
+    payload = await _scraper_status_payload(db)
     return templates.TemplateResponse(
         "admin/scraper.html",
         {
             "request": request,
             "admin": admin,
-            "runs": runs,
-            "latest": latest,
-            "running": running,
+            "initial_status": payload,
         },
     )
+
+
+@router.get("/scraper/status")
+async def admin_scraper_status_json(
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    return await _scraper_status_payload(db)
 
 
 # ---------------------------------------------------------------------------
