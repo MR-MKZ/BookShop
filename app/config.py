@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     # Scraper
     SCRAPER_CONCURRENCY: int = 20
     SCRAPER_LOOP_INTERVAL: int = 3600
+    # How many books to buffer before writing to Postgres (also flushed on timeout)
+    SCRAPER_FLUSH_SIZE: int = 25
+    SCRAPER_FLUSH_TIMEOUT: float = 5.0
 
     # First admin bootstrap (created on boot if no admin exists)
     ADMIN_PHONE: str = ""

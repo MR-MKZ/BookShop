@@ -637,8 +637,11 @@ class BookScraper:
     async def db_writer(self):
         """Flush often so Ctrl+C / docker stop does not lose scraped rows."""
         batch = []
-        flush_size = 25
-        flush_timeout = 5.0
+        flush_size = max(1, int(os.getenv("SCRAPER_FLUSH_SIZE", "25")))
+        flush_timeout = max(1.0, float(os.getenv("SCRAPER_FLUSH_TIMEOUT", "5")))
+        logger.info(
+            "DB writer flush_size=%s flush_timeout=%ss", flush_size, flush_timeout
+        )
         while True:
             try:
                 data = await asyncio.wait_for(
