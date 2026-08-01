@@ -565,9 +565,7 @@ def _parse_price(price: str, original_price: str) -> tuple[Decimal, Decimal] | s
         return "قیمت نامعتبر است"
 
 
-# ---------------------------------------------------------------------------
 # Dashboard
-# ---------------------------------------------------------------------------
 
 
 @router.get("/", response_class=HTMLResponse)
@@ -638,9 +636,7 @@ async def admin_dashboard(
     )
 
 
-# ---------------------------------------------------------------------------
 # Books
-# ---------------------------------------------------------------------------
 
 
 @router.get("/books", response_class=HTMLResponse)
@@ -1055,9 +1051,7 @@ async def admin_download_file(
     return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
 
 
-# ---------------------------------------------------------------------------
 # Users
-# ---------------------------------------------------------------------------
 
 
 @router.get("/users", response_class=HTMLResponse)
@@ -1369,9 +1363,7 @@ async def admin_toggle_user(
     return RedirectResponse(url="/admin/users", status_code=status.HTTP_303_SEE_OTHER)
 
 
-# ---------------------------------------------------------------------------
 # Orders / Reports
-# ---------------------------------------------------------------------------
 
 
 @router.get("/orders", response_class=HTMLResponse)
@@ -1498,9 +1490,7 @@ async def admin_reports(
     )
 
 
-# ---------------------------------------------------------------------------
 # Scraper status
-# ---------------------------------------------------------------------------
 
 
 def _scraper_run_dict(run: ScraperRun) -> dict:
@@ -1562,9 +1552,7 @@ async def admin_scraper_status_json(
     return await _scraper_status_payload(db)
 
 
-# ---------------------------------------------------------------------------
 # Landing hero covers
-# ---------------------------------------------------------------------------
 
 
 async def _get_hero_carousel_seconds(db: AsyncSession) -> int:
@@ -1769,9 +1757,7 @@ async def admin_hero_delete(
     )
 
 
-# ---------------------------------------------------------------------------
 # Coupons & download settings
-# ---------------------------------------------------------------------------
 
 
 def _parse_admin_dt(raw: str | None) -> datetime | None:
