@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # Use SECRET_KEY for signing and validating links
 signer = URLSafeTimedSerializer(settings.SECRET_KEY)
 
-DEFAULT_COVER_PATH = Path(__file__).resolve().parent.parent / "static" / "img" / "book" / "default.jpg"
+DEFAULT_COVER_PATH = Path(__file__).resolve().parent.parent / "static" / "img" / "book" / "default.png"
 
 # Covers change rarely; allow long browser/CDN cache (proxy still used — never direct FTP).
 COVER_CACHE_CONTROL = "public, max-age=604800, stale-while-revalidate=86400"

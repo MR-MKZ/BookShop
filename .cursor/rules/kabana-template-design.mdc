@@ -26,7 +26,7 @@ The FastAPI app under `app/templates/` must reuse kabana’s structure and class
 ## Covers & titles
 
 - Demo images in kabana are uniform; real covers are not. Keep equal cover boxes (`object-fit: cover`, fixed 2:3 area) without changing kabana’s card chrome.
-- Missing covers → `/static/img/book/default.jpg` (and/or media proxy default). Never point `onerror` at a non-existent path.
+- Missing covers → `/static/img/book/default.png` (and/or media proxy default). Never point `onerror` at a non-existent path.
 - Titles: full card width (not a fixed ~150px). Prefer kabana caption styling + `1rem` title size on listings.
 
 ## Do / Don’t
