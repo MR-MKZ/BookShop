@@ -1,10 +1,8 @@
-"""Shopping cart: add/remove books and checkout multiple items."""
+"""Shopping cart: add/remove books; checkout is at /checkout."""
 
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timezone
-from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
@@ -12,10 +10,10 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy import and_, delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth import get_current_user, get_current_user_optional
+from app.auth import get_current_user_optional
 from app.database import get_async_db
 from app.models import Book, Cart, Order, OrderItem, OrderStatus, User
-from app.services import zibal
+from app.utils.security import cookie_kwargs
 
 router = APIRouter(tags=["cart"])
 templates = Jinja2Templates(directory="app/templates")
@@ -30,7 +28,7 @@ def _cart_session_id(request: Request) -> str | None:
 def _new_session_cookie(response: RedirectResponse) -> str:
     sid = secrets.token_urlsafe(24)
     response.set_cookie(
-        CART_COOKIE, sid, max_age=60 * 60 * 24 * 30, httponly=True, samesite="lax"
+        CART_COOKIE, sid, **cookie_kwargs(max_age=60 * 60 * 24 * 30)
     )
     return sid
 
@@ -190,92 +188,6 @@ async def remove_from_cart(
 
 
 @router.post("/cart/checkout")
-async def checkout_cart(
-    request: Request,
-    db: AsyncSession = Depends(get_async_db),
-    current_user: User = Depends(get_current_user),
-):
-    sid = _cart_session_id(request)
-    items = await _load_cart_items(db, current_user, sid)
-    if not items:
-        return RedirectResponse(url="/cart?msg=empty", status_code=status.HTTP_303_SEE_OTHER)
-
-    to_buy: list[Book] = []
-    seen: set[int] = set()
-    for cart_row, book in items:
-        if book.id in seen:
-            await db.delete(cart_row)
-            continue
-        if await _owns_book(db, current_user.id, book.id):
-            await db.delete(cart_row)
-            continue
-        if not book.has_pdf or not book.is_active:
-            continue
-        seen.add(book.id)
-        to_buy.append(book)
-
-    await db.flush()
-
-    if not to_buy:
-        await db.commit()
-        return RedirectResponse(url="/profile", status_code=status.HTTP_303_SEE_OTHER)
-
-    total = sum(int(book.price or 0) for book in to_buy)
-
-    if total <= 0:
-        order = Order(
-            user_id=current_user.id,
-            status=OrderStatus.PAID,
-            total_amount=Decimal("0"),
-            paid_at=datetime.now(timezone.utc),
-        )
-        db.add(order)
-        await db.flush()
-        for book in to_buy:
-            db.add(OrderItem(order_id=order.id, book_id=book.id, price=0, quantity=1))
-        await _clear_cart(db, current_user, sid)
-        await db.commit()
-        return RedirectResponse(url="/profile?pay=ok", status_code=status.HTTP_303_SEE_OTHER)
-
-    order = Order(
-        user_id=current_user.id,
-        status=OrderStatus.PENDING,
-        total_amount=total,
-    )
-    db.add(order)
-    await db.flush()
-    for book in to_buy:
-        db.add(
-            OrderItem(
-                order_id=order.id,
-                book_id=book.id,
-                price=book.price or 0,
-                quantity=1,
-            )
-        )
-    await db.commit()
-    await db.refresh(order)
-
-    callback = str(request.base_url).rstrip("/") + "/payment/callback"
-    titles = "، ".join((b.title or "")[:40] for b in to_buy[:3])
-    try:
-        data = await zibal.request_payment(
-            amount_toman=total,
-            order_id=order.id,
-            description=f"خرید سبد: {titles}",
-            mobile=current_user.phone,
-            callback_url=callback,
-        )
-    except zibal.ZibalError as e:
-        order.status = OrderStatus.FAILED
-        await db.commit()
-        raise HTTPException(status_code=502, detail=str(e)) from e
-
-    track_id = data.get("trackId")
-    order.payment_gateway_transaction_id = str(track_id)
-    await db.commit()
-
-    return RedirectResponse(
-        url=zibal.payment_start_url(track_id),
-        status_code=status.HTTP_303_SEE_OTHER,
-    )
+async def checkout_cart():
+    """Legacy endpoint — guest checkout lives at /checkout."""
+    return RedirectResponse(url="/checkout", status_code=status.HTTP_303_SEE_OTHER)

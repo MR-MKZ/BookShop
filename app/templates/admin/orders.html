@@ -17,9 +17,10 @@
     <thead>
         <tr>
             <th>شناسه</th>
-            <th>کاربر</th>
+            <th>کاربر / صورتحساب</th>
             <th>مبلغ</th>
             <th>وضعیت</th>
+            <th>درگاه</th>
             <th>trackId</th>
             <th>ref</th>
             <th>کتاب‌ها</th>
@@ -30,11 +31,25 @@
         {% for o in orders %}
         <tr>
             <td>{{ o.id }}</td>
-            <td>{% if o.user %}{{ o.user.phone }}{% else %}—{% endif %}</td>
+            <td>
+                {% if o.user %}
+                    {{ o.user.phone }}
+                {% else %}
+                    <span class="badge">مهمان</span>
+                {% endif %}
+                {% if o.billing_phone or o.billing_email %}
+                <br><small style="color:#64748b;">
+                    {{ o.billing_first_name or '' }} {{ o.billing_last_name or '' }}
+                    {% if o.billing_phone %}<br dir="ltr">{{ o.billing_phone }}{% endif %}
+                    {% if o.billing_email %}<br dir="ltr">{{ o.billing_email }}{% endif %}
+                </small>
+                {% endif %}
+            </td>
             <td dir="ltr">{{ "{:,.0f}".format(o.total_amount|float) if o.total_amount else 0 }}</td>
             <td>
                 <span class="badge {{ o.status|order_status_badge }}">{{ o.status|order_status_fa }}</span>
             </td>
+            <td dir="ltr">{{ o.payment_gateway or '—' }}</td>
             <td dir="ltr">{{ o.payment_gateway_transaction_id or '—' }}</td>
             <td dir="ltr">{{ o.payment_gateway_ref_id or '—' }}</td>
             <td>
@@ -45,7 +60,7 @@
             <td class="date-fa" title="ساعت تهران">{{ o.created_at|jalali }}</td>
         </tr>
         {% else %}
-        <tr><td colspan="8">سفارشی نیست</td></tr>
+        <tr><td colspan="9">سفارشی نیست</td></tr>
         {% endfor %}
     </tbody>
 </table>

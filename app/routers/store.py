@@ -20,7 +20,8 @@ from app.models import (
     OrderStatus,
     User,
 )
-from app.routers.media import signer
+from app.services.checkout_helpers import get_download_ttl_seconds
+from app.services.downloads import download_url, make_download_token
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
@@ -33,16 +34,12 @@ def _cover_url(book: Book) -> str:
     return f"/media/proxy/cover/{book.folder_name}/{cover}"
 
 
-def _download_token(book: Book, user_id: int) -> str:
-    return signer.dumps(
-        {
-            "folder": book.folder_name,
-            "filename": book.pdf_filename,
-            "download_name": book.download_filename,
-            "user_id": user_id,
-            "book_id": book.id,
-        },
-        salt="pdf-download",
+async def _download_token_for(
+    db, book: Book, user_id: int | None, order_id: int | None = None
+) -> str:
+    ttl = await get_download_ttl_seconds(db)
+    return make_download_token(
+        book, user_id=user_id, order_id=order_id, ttl_seconds=ttl
     )
 
 
@@ -189,7 +186,7 @@ async def book_detail(
     if current_user:
         owned = await _user_owns_book(db, current_user.id, book.id)
         if owned and book.has_pdf:
-            download_token = _download_token(book, current_user.id)
+            download_token = await _download_token_for(db, book, current_user.id)
 
     return templates.TemplateResponse(
         "detail.html",
@@ -237,7 +234,7 @@ async def profile(
             seen.add(item.book_id)
             token = None
             if item.book.has_pdf:
-                token = _download_token(item.book, current_user.id)
+                token = await _download_token_for(db, item.book, current_user.id)
             library.append({"book": item.book, "token": token, "order": order})
 
     return templates.TemplateResponse(
@@ -267,6 +264,6 @@ async def download_book(
     if not await _user_owns_book(db, current_user.id, book.id):
         raise HTTPException(status_code=403, detail="ابتدا کتاب را خریداری کنید")
 
-    token = _download_token(book, current_user.id)
-    url = f"/media/proxy/book/{book.folder_name}/{book.pdf_filename}?token={token}"
+    token = await _download_token_for(db, book, current_user.id)
+    url = download_url(book, token)
     return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)

@@ -1,0 +1,81 @@
+{% extends "admin/base.html" %}
+{% from "macros.html" import page_pagination %}
+{% block title %}کدهای تخفیف{% endblock %}
+{% block content %}
+<h1>کدهای تخفیف</h1>
+{% if message == 'ttl_saved' %}
+<div class="msg">مدت اعتبار لینک دانلود ذخیره شد.</div>
+{% elif message == 'deleted' %}
+<div class="msg">کد تخفیف حذف شد.</div>
+{% elif message == 'deactivated' %}
+<div class="msg">کد به‌خاطر استفاده در سفارش‌ها غیرفعال شد.</div>
+{% elif message == 'ttl_invalid' %}
+<div class="msg" style="background:#fef2f2;color:#b91c1c;">مقدار TTL نامعتبر است.</div>
+{% elif message %}
+<div class="msg">عملیات انجام شد ({{ message }}).</div>
+{% endif %}
+
+<div class="card" style="margin-bottom:24px;max-width:480px;">
+    <h2 style="font-size:1.1rem;">مدت اعتبار لینک دانلود</h2>
+    <form method="post" action="/admin/settings/download-ttl" class="filters" style="margin:0;">
+        <label>
+            ساعت
+            <input type="number" name="hours" min="1" max="720" value="{{ ttl_hours }}" required style="width:100px;">
+        </label>
+        <button class="btn" type="submit">ذخیره</button>
+    </form>
+    <p style="color:#64748b;font-size:.85rem;margin:8px 0 0;">پیش‌فرض ۶ ساعت. پس از انقضا کاربر می‌تواند از بازیابی سفارش لینک جدید بگیرد.</p>
+</div>
+
+<div class="btn-row" style="margin-bottom:16px;">
+    <a class="btn" href="/admin/coupons/new">کد تخفیف جدید</a>
+</div>
+<p>{{ total }} کد</p>
+<table>
+    <thead>
+        <tr>
+            <th>کد</th>
+            <th>نوع</th>
+            <th>مقدار</th>
+            <th>استفاده</th>
+            <th>بازه</th>
+            <th>وضعیت</th>
+            <th>عملیات</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for c in coupons %}
+        <tr>
+            <td dir="ltr"><strong>{{ c.code }}</strong></td>
+            <td>{% if c.discount_type.value == 'PERCENT' %}درصدی{% else %}مبلغ ثابت{% endif %}</td>
+            <td dir="ltr">
+                {% if c.discount_type.value == 'PERCENT' %}
+                    {{ c.amount|int }}%
+                {% else %}
+                    {{ "{:,.0f}".format(c.amount|float) }} تومان
+                {% endif %}
+            </td>
+            <td dir="ltr">{{ c.used_count }}{% if c.max_uses is not none %} / {{ c.max_uses }}{% endif %}</td>
+            <td class="date-fa">
+                {% if c.starts_at %}از {{ c.starts_at|jalali }}{% else %}—{% endif %}
+                <br>
+                {% if c.ends_at %}تا {{ c.ends_at|jalali }}{% else %}بدون پایان{% endif %}
+            </td>
+            <td>{% if c.is_active %}فعال{% else %}غیرفعال{% endif %}</td>
+            <td>
+                <div class="btn-row btn-row-sm">
+                    <a class="btn btn-sm btn-secondary" href="/admin/coupons/{{ c.id }}">ویرایش</a>
+                    <form method="post" action="/admin/coupons/{{ c.id }}/delete"
+                          onsubmit="return confirm('حذف / غیرفعال شود؟');">
+                        <button class="btn btn-sm btn-danger" type="submit">حذف</button>
+                    </form>
+                </div>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">کدی ثبت نشده است</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{{ page_pagination(page, total_pages, '/admin/coupons?', 'admin') }}
+{% endblock %}

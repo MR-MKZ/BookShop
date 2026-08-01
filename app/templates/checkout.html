@@ -1,0 +1,537 @@
+{% extends "base.html" %}
+
+{% block title %}تسویه حساب — کابانا{% endblock %}
+
+{% block breadcrumb %}
+<div class="breadcrumb-items">
+    <div class="row">
+        <ul class="breadcrumb">
+            <li><a href="/" class="breadcrumb-link">صفحه اصلی</a></li>
+            <li class="chevron"><span class="fa fa-chevron-left"></span></li>
+            <li><a href="/cart" class="breadcrumb-link">سبد خرید</a></li>
+            <li class="chevron"><span class="fa fa-chevron-left"></span></li>
+            <li><span class="breadcrumb-active">تسویه حساب</span></li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+    /* Scoped checkout UI — avoid kabana .p_star floating placeholders */
+    .checkout-page {
+        padding-top: 24px !important;
+        padding-bottom: 48px !important;
+    }
+    .checkout-page .checkout-page-title {
+        font-size: 1.35rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 18px;
+    }
+    .checkout-page .checkout-alert {
+        border-radius: 10px;
+        padding: 12px 14px;
+        margin-bottom: 16px;
+        font-size: 0.92rem;
+    }
+    .checkout-page .checkout-banner {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 16px;
+    }
+    .checkout-page .checkout-banner p {
+        margin: 0;
+        font-size: 0.9rem;
+        color: #475569;
+        line-height: 1.6;
+    }
+    .checkout-page .checkout-banner a.checkout-link-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 40px;
+        padding: 8px 16px;
+        border-radius: 999px;
+        background: #fff;
+        border: 1px solid #00a4a6;
+        color: #00a4a6 !important;
+        font-size: 0.88rem;
+        font-weight: 600;
+        text-decoration: none !important;
+        white-space: nowrap;
+    }
+    .checkout-page .checkout-banner a.checkout-link-btn:hover {
+        background: #00a4a6;
+        color: #fff !important;
+    }
+
+    .checkout-page .coupon-card {
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 14px 16px;
+        margin-bottom: 20px;
+    }
+    .checkout-page .coupon-card h3 {
+        font-size: 0.95rem;
+        font-weight: 700;
+        margin: 0 0 10px;
+        color: #334155;
+    }
+    .checkout-page .coupon-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: stretch;
+    }
+    .checkout-page .coupon-row input {
+        flex: 1 1 180px;
+        min-width: 0;
+        height: 44px;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 0 14px;
+        font-size: 0.95rem;
+        background: #fff;
+        outline: none;
+    }
+    .checkout-page .coupon-row input:focus {
+        border-color: #00a4a6;
+        box-shadow: 0 0 0 3px rgba(0, 164, 166, 0.12);
+    }
+    .checkout-page .coupon-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+    .checkout-page .coupon-btn {
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 0 18px !important;
+        border-radius: 10px !important;
+        border: 0 !important;
+        background: #00a4a6 !important;
+        color: #fff !important;
+        font-size: 0.9rem !important;
+        font-weight: 600 !important;
+        line-height: 1.2 !important;
+        cursor: pointer;
+        white-space: nowrap;
+        position: relative;
+        z-index: 1;
+        overflow: visible !important;
+        text-transform: none !important;
+        box-shadow: none !important;
+    }
+    .checkout-page .coupon-btn::before {
+        display: none !important;
+        content: none !important;
+    }
+    .checkout-page .coupon-btn.is-secondary {
+        background: #64748b !important;
+    }
+    .checkout-page .coupon-applied {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
+        border-radius: 10px;
+        padding: 10px 12px;
+    }
+    .checkout-page .coupon-applied strong {
+        color: #166534;
+    }
+    .checkout-page .coupon-error {
+        color: #dc2626;
+        font-size: 0.85rem;
+        margin: 8px 0 0;
+    }
+
+    .checkout-page .field {
+        margin-bottom: 14px;
+    }
+    .checkout-page .field label {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #334155;
+    }
+    .checkout-page .field label .req {
+        color: #dc2626;
+        margin-inline-start: 2px;
+    }
+    .checkout-page .field input,
+    .checkout-page .field textarea {
+        width: 100%;
+        height: 44px;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 0 14px;
+        font-size: 0.95rem;
+        background: #fff;
+        color: #1e293b;
+        outline: none;
+        box-shadow: none;
+    }
+    .checkout-page .field textarea {
+        height: auto;
+        min-height: 96px;
+        padding: 12px 14px;
+        resize: vertical;
+    }
+    .checkout-page .field input:focus,
+    .checkout-page .field textarea:focus {
+        border-color: #00a4a6;
+        box-shadow: 0 0 0 3px rgba(0, 164, 166, 0.12);
+        text-align: inherit !important;
+    }
+    .checkout-page .field input[dir="ltr"],
+    .checkout-page .coupon-row input[dir="ltr"] {
+        text-align: left;
+    }
+    .checkout-page .account-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 14px;
+        margin: 8px 0 16px;
+    }
+    .checkout-page .account-box .checkout-cap {
+        margin-bottom: 12px;
+    }
+    .checkout-page .account-box .checkout-cap label {
+        font-weight: 600;
+        color: #334155;
+        margin: 0;
+        cursor: pointer;
+    }
+    .checkout-page .password-field {
+        position: relative;
+        margin-bottom: 0;
+    }
+    .checkout-page .password-field input {
+        padding-inline-end: 48px !important;
+        margin-bottom: 0 !important;
+    }
+    .checkout-page .password-toggle {
+        position: absolute;
+        inset-inline-end: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        border: 0;
+        background: transparent;
+        color: #64748b;
+        cursor: pointer;
+        padding: 6px;
+        line-height: 1;
+    }
+    .checkout-page .password-toggle:hover { color: #00a4a6; }
+
+    .checkout-page .section-heading {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 14px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+    .checkout-page .order_box {
+        border-radius: 14px;
+        position: sticky;
+        top: 90px;
+    }
+    .checkout-page .order_box .btn,
+    .checkout-page .place-order-btn {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        min-height: 48px;
+        padding: 12px 16px !important;
+        border-radius: 12px !important;
+        line-height: 1.2 !important;
+        overflow: visible !important;
+        font-size: 1rem !important;
+        font-weight: 700 !important;
+    }
+    .checkout-page .order_box .btn::before,
+    .checkout-page .place-order-btn::before {
+        display: none !important;
+        content: none !important;
+    }
+    .checkout-page .payment_item {
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+    }
+    .checkout-page .payment_item.active {
+        border-color: #00a4a6;
+        background: #f0fdfa;
+    }
+    .checkout-page .recover-hint {
+        font-size: 0.8rem;
+        color: #64748b;
+        margin-top: 10px;
+        line-height: 1.6;
+    }
+    /* Theme sets `a, button { color: #fff }` — force readable teal on white card */
+    .checkout-page .recover-hint a,
+    .checkout-page .recover-hint a.text-link,
+    .checkout-page .recover-hint a:link,
+    .checkout-page .recover-hint a:visited,
+    .checkout-page .order_box a.text-link {
+        color: #00a4a6 !important;
+        font-weight: 700;
+        text-decoration: underline !important;
+    }
+    .checkout-page .recover-hint a:hover,
+    .checkout-page .recover-hint a:focus,
+    .checkout-page .order_box a.text-link:hover,
+    .checkout-page .order_box a.text-link:focus {
+        color: #02787a !important;
+    }
+
+    @media (max-width: 991.98px) {
+        .checkout-page {
+            padding-top: 12px !important;
+            padding-bottom: 32px !important;
+        }
+        .checkout-page .order_box {
+            position: static;
+            margin-top: 8px;
+        }
+        .checkout-page .checkout-banner {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .checkout-page .checkout-banner a.checkout-link-btn {
+            width: 100%;
+        }
+        .checkout-page .coupon-row {
+            flex-direction: column;
+        }
+        .checkout-page .coupon-btn,
+        .checkout-page .coupon-actions {
+            width: 100%;
+        }
+        .checkout-page .coupon-btn {
+            width: 100%;
+        }
+    }
+</style>
+
+<section class="checkout_area section-padding checkout-page">
+    <div class="container">
+        <h1 class="checkout-page-title">تسویه حساب</h1>
+
+        {% if error %}
+        <div class="alert alert-danger checkout-alert">{{ error }}</div>
+        {% endif %}
+
+        {% if not current_user %}
+        <div class="checkout-banner">
+            <p>قبلاً ثبت‌نام کرده‌اید؟ با ورود، اطلاعاتتان خودکار پر می‌شود. در غیر این صورت می‌توانید به‌عنوان مهمان خرید کنید.</p>
+            <a class="checkout-link-btn" href="/auth/login?next=/checkout">ورود به حساب</a>
+        </div>
+        {% endif %}
+
+        <div class="coupon-card">
+            <h3>کد تخفیف</h3>
+            {% if coupon %}
+            <div class="coupon-applied">
+                <div>
+                    کد <strong dir="ltr">{{ coupon.code }}</strong> اعمال شد
+                    — تخفیف {{ format_price(discount) }} تومان
+                </div>
+                <form method="post" action="/checkout/apply-coupon">
+                    <input type="hidden" name="action" value="remove">
+                    <button type="submit" class="coupon-btn is-secondary">حذف کد</button>
+                </form>
+            </div>
+            {% else %}
+            <form method="post" action="/checkout/apply-coupon" class="coupon-row">
+                <input type="text" name="coupon_code" placeholder="مثلاً SUMMER1405"
+                       value="{{ coupon_input or '' }}" dir="ltr" autocomplete="off">
+                <div class="coupon-actions">
+                    <button type="submit" name="action" value="apply" class="coupon-btn">اعمال کد</button>
+                </div>
+            </form>
+            {% if coupon_error %}
+            <p class="coupon-error">{{ coupon_error }} — می‌توانید بدون کد تخفیف ادامه دهید یا کد دیگری بزنید.</p>
+            {% endif %}
+            {% endif %}
+        </div>
+
+        <div class="billing_details">
+            <form method="post" action="/checkout/place-order" id="checkout-form">
+                <div class="row">
+                    <div class="col-lg-8">
+                        <h2 class="section-heading">جزئیات صورتحساب</h2>
+                        <div class="row">
+                            <div class="col-md-6 field">
+                                <label for="first_name">نام<span class="req">*</span></label>
+                                <input type="text" id="first_name" name="first_name"
+                                       value="{{ form.first_name or '' }}" required autocomplete="given-name">
+                            </div>
+                            <div class="col-md-6 field">
+                                <label for="last_name">نام خانوادگی<span class="req">*</span></label>
+                                <input type="text" id="last_name" name="last_name"
+                                       value="{{ form.last_name or '' }}" required autocomplete="family-name">
+                            </div>
+                            <div class="col-md-6 field">
+                                <label for="phone">تلفن همراه<span class="req">*</span></label>
+                                <input type="tel" id="phone" name="phone" dir="ltr"
+                                       value="{{ form.phone or '' }}" required
+                                       placeholder="09121234567" autocomplete="tel"
+                                       pattern="09[0-9]{9}">
+                            </div>
+                            <div class="col-md-6 field">
+                                <label for="email">ایمیل<span class="req">*</span></label>
+                                <input type="email" id="email" name="email" dir="ltr"
+                                       value="{{ form.email or '' }}" required
+                                       placeholder="name@example.com" autocomplete="email">
+                            </div>
+                        </div>
+
+                        {% if not current_user %}
+                        <div class="account-box">
+                            <div class="checkout-cap">
+                                <input type="checkbox" id="create_account" name="create_account" value="1"
+                                       {% if form.create_account %}checked{% endif %}>
+                                <label for="create_account">می‌خواهم حساب کاربری بسازم (اختیاری)</label>
+                            </div>
+                            <div class="row account-fields" style="display:none;">
+                                <div class="col-md-6 field">
+                                    <label for="password">رمز عبور<span class="req">*</span></label>
+                                    <div class="password-field">
+                                        <input type="password" id="password" name="password"
+                                               autocomplete="new-password" minlength="6"
+                                               placeholder="حداقل ۶ کاراکتر">
+                                        <button type="button" class="password-toggle" data-password-toggle="password" aria-label="نمایش رمز">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-md-6 field">
+                                    <label for="password_confirm">تکرار رمز عبور<span class="req">*</span></label>
+                                    <div class="password-field">
+                                        <input type="password" id="password_confirm" name="password_confirm"
+                                               autocomplete="new-password" minlength="6"
+                                               placeholder="تکرار رمز">
+                                        <button type="button" class="password-toggle" data-password-toggle="password_confirm" aria-label="نمایش رمز">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <h2 class="section-heading">توضیحات تکمیلی</h2>
+                        <div class="field">
+                            <label for="customer_note">توضیحات سفارش (اختیاری)</label>
+                            <textarea id="customer_note" name="customer_note" rows="3"
+                                      placeholder="اگر نکته‌ای درباره سفارش دارید بنویسید…">{{ form.customer_note or '' }}</textarea>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-4">
+                        <div class="order_box">
+                            <h2>خلاصه سفارش</h2>
+                            <ul class="list">
+                                <li>
+                                    <a href="#">محصول<span>جمع</span></a>
+                                </li>
+                                {% for book in books %}
+                                <li>
+                                    <a href="/book/{{ book.id }}">{{ book.title }}
+                                        <span class="middle">× ۱</span>
+                                        <span class="last">{{ format_price(book.price) }} تومان</span>
+                                    </a>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            <ul class="list list_2">
+                                <li>
+                                    <a href="#">جمع جزء <span>{{ format_price(subtotal) }} تومان</span></a>
+                                </li>
+                                {% if discount and discount > 0 %}
+                                <li>
+                                    <a href="#">تخفیف <span>{{ format_price(discount) }} تومان</span></a>
+                                </li>
+                                {% endif %}
+                                <li>
+                                    <a href="#">پرداخت نهایی<span>{{ format_price(total) }} تومان</span></a>
+                                </li>
+                            </ul>
+
+                            <input type="hidden" name="coupon_code" value="{{ coupon.code if coupon else '' }}">
+
+                            {% if total > 0 %}
+                            <div class="payment-gateways mt-3">
+                                {% for gw in gateways %}
+                                <div class="payment_item {% if gw.is_default or (form.payment_gateway == gw.id) %}active{% endif %}">
+                                    <div class="radion_btn">
+                                        <input type="radio" id="gw-{{ gw.id }}" name="payment_gateway"
+                                               value="{{ gw.id }}"
+                                               {% if form.payment_gateway == gw.id or (not form.payment_gateway and gw.is_default) %}checked{% endif %}>
+                                        <label for="gw-{{ gw.id }}">{{ gw.title }}</label>
+                                        <div class="check"></div>
+                                    </div>
+                                    {% if gw.description %}
+                                    <p>{{ gw.description }}</p>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <input type="hidden" name="payment_gateway" value="{{ gateways[0].id if gateways else 'zibal' }}">
+                            <p class="mt-3">مبلغ قابل پرداخت صفر است؛ سفارش بدون درگاه ثبت می‌شود.</p>
+                            {% endif %}
+
+                            <button type="submit" class="btn place-order-btn mt-3">ثبت سفارش</button>
+                            <p class="recover-hint">
+                                اگر پس از پرداخت لینک دانلود را ندیدید، از
+                                <a class="text-link" href="/orders/recover">بازیابی سفارش</a> استفاده کنید.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</section>
+
+<script>
+(function () {
+    var cb = document.getElementById('create_account');
+    if (!cb) return;
+    var fields = document.querySelectorAll('.account-fields');
+    function sync() {
+        fields.forEach(function (el) {
+            el.style.display = cb.checked ? '' : 'none';
+            el.querySelectorAll('input').forEach(function (input) {
+                input.required = cb.checked;
+            });
+        });
+    }
+    cb.addEventListener('change', sync);
+    sync();
+})();
+</script>
+{% endblock %}

@@ -36,6 +36,11 @@ class OrderStatus(str, enum.Enum):
     CANCELLED = "CANCELLED"
 
 
+class DiscountType(str, enum.Enum):
+    PERCENT = "PERCENT"
+    FIXED = "FIXED"
+
+
 class Book(Base):
     __tablename__ = "books"
 
@@ -213,11 +218,37 @@ class User(Base):
         return self.full_name or self.phone or "کاربر"
 
 
+class Coupon(Base):
+    __tablename__ = "coupons"
+
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String, unique=True, index=True, nullable=False)
+    discount_type = Column(
+        SQLEnum(
+            DiscountType,
+            name="discounttype",
+            values_callable=lambda x: [e.value for e in x],
+        ),
+        nullable=False,
+    )
+    amount = Column(Numeric(10, 2), nullable=False)
+    max_uses = Column(Integer, nullable=True)
+    used_count = Column(Integer, default=0, server_default="0", nullable=False)
+    starts_at = Column(DateTime(timezone=True), nullable=True)
+    ends_at = Column(DateTime(timezone=True), nullable=True)
+    is_active = Column(Boolean, default=True, server_default="true", nullable=False)
+    min_order_amount = Column(Numeric(10, 2), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    redemptions = relationship("CouponRedemption", back_populates="coupon")
+    orders = relationship("Order", back_populates="coupon")
+
+
 class Order(Base):
     __tablename__ = "orders"
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     status = Column(
         SQLEnum(
             OrderStatus,
@@ -227,6 +258,16 @@ class Order(Base):
         default=OrderStatus.PENDING,
     )
     total_amount = Column(Numeric(10, 2))
+    subtotal_amount = Column(Numeric(10, 2), nullable=True)
+    discount_amount = Column(Numeric(10, 2), nullable=True, default=0)
+    coupon_id = Column(Integer, ForeignKey("coupons.id"), nullable=True)
+    billing_first_name = Column(String, nullable=True)
+    billing_last_name = Column(String, nullable=True)
+    billing_phone = Column(String, nullable=True, index=True)
+    billing_email = Column(String, nullable=True, index=True)
+    customer_note = Column(Text, nullable=True)
+    access_token = Column(String, unique=True, index=True, nullable=True)
+    payment_gateway = Column(String, nullable=True)
     payment_gateway_transaction_id = Column(String, nullable=True, index=True)
     payment_gateway_ref_id = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -236,6 +277,10 @@ class Order(Base):
     user = relationship("User", back_populates="orders")
     items = relationship("OrderItem", back_populates="order")
     download_links = relationship("DownloadLink", back_populates="order")
+    coupon = relationship("Coupon", back_populates="orders")
+    coupon_redemption = relationship(
+        "CouponRedemption", back_populates="order", uselist=False
+    )
 
 
 class OrderItem(Base):
@@ -252,12 +297,24 @@ class OrderItem(Base):
     book = relationship("Book", back_populates="order_items")
 
 
+class CouponRedemption(Base):
+    __tablename__ = "coupon_redemptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    coupon_id = Column(Integer, ForeignKey("coupons.id"), nullable=False)
+    order_id = Column(Integer, ForeignKey("orders.id"), unique=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    coupon = relationship("Coupon", back_populates="redemptions")
+    order = relationship("Order", back_populates="coupon_redemption")
+
+
 class DownloadLink(Base):
     __tablename__ = "download_links"
 
     id = Column(Integer, primary_key=True, index=True)
     token = Column(String, unique=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     order_id = Column(Integer, ForeignKey("orders.id"))
     book_id = Column(Integer, ForeignKey("books.id"))
     is_used = Column(Boolean, default=False)
@@ -347,3 +404,6 @@ HERO_CAROUSEL_SECONDS_DEFAULT = 10
 HERO_FOLDER = "hero"
 HERO_RECOMMENDED_SIZE = "1920 × 700"
 HERO_MIN_SIZE = "1338 × 600"
+
+DOWNLOAD_LINK_TTL_HOURS_KEY = "download_link_ttl_hours"
+DOWNLOAD_LINK_TTL_HOURS_DEFAULT = 6

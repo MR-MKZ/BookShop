@@ -1,29 +1,60 @@
 (function ($) {
   "use strict"
 
-  /* 1. sticky And Scroll UP — rAF throttle to avoid scroll jank */
+  /* 1. sticky And Scroll UP — spacer + hysteresis to avoid bottom scroll glitch */
   var stickyTicking = false;
+  var stickyOn = false;
+  var STICKY_ON_AT = 400;
+  var STICKY_OFF_AT = 280;
+
+  function ensureStickySpacer($header) {
+    var $spacer = $("#sticky-header-spacer");
+    if (!$spacer.length) {
+      $spacer = $('<div id="sticky-header-spacer" aria-hidden="true"></div>');
+      $header.after($spacer);
+    }
+    $spacer.height($header.outerHeight() || 0);
+  }
+
+  function clearStickySpacer() {
+    $("#sticky-header-spacer").remove();
+  }
+
   function updateStickyHeader() {
     var scroll = $(window).scrollTop();
-    if (scroll < 400) {
-      $(".header-sticky").removeClass("sticky-bar");
-      $('#back-top').stop(true, true).fadeOut(200);
-    } else {
-      $(".header-sticky").addClass("sticky-bar");
-      $('#back-top').stop(true, true).fadeIn(200);
+    var $header = $(".header-sticky").first();
+
+    if (!stickyOn && scroll >= STICKY_ON_AT) {
+      stickyOn = true;
+      ensureStickySpacer($header);
+      $header.addClass("sticky-bar");
+      $("#back-top").stop(true, true).fadeIn(200);
+    } else if (stickyOn && scroll < STICKY_OFF_AT) {
+      stickyOn = false;
+      $header.removeClass("sticky-bar");
+      clearStickySpacer();
+      $("#back-top").stop(true, true).fadeOut(200);
+    } else if (stickyOn) {
+      // Keep spacer height in sync (fonts/wrap can change)
+      ensureStickySpacer($header);
     }
+
     stickyTicking = false;
   }
-  $(window).on('scroll', function () {
+
+  $(window).on("scroll", function () {
     if (!stickyTicking) {
       stickyTicking = true;
       window.requestAnimationFrame(updateStickyHeader);
     }
   });
 
+  // Start with back-top hidden
+  $("#back-top").hide();
+
   // Scroll Up
-  $('#back-top a').on("click", function () {
-    $('body,html').animate({
+  $("#back-top a").on("click", function () {
+    $("body,html").animate({
       scrollTop: 0
     }, 400);
     return false;

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}سفارش #{{ order.id }} — کابانا{% endblock %}
+
+{% block breadcrumb %}
+<div class="breadcrumb-items">
+    <div class="row">
+        <ul class="breadcrumb">
+            <li><a href="/" class="breadcrumb-link">صفحه اصلی</a></li>
+            <li class="chevron"><span class="fa fa-chevron-left"></span></li>
+            <li><span class="breadcrumb-active">نتیجه سفارش</span></li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<section class="cart_area section-padding order-thanks-page">
+    <div class="container">
+        {% if paid %}
+        <div class="alert alert-success">
+            پرداخت با موفقیت انجام شد. سفارش شماره <strong>{{ order.id }}</strong> ثبت شد.
+        </div>
+        <h3 class="mb-3">لینک‌های دانلود</h3>
+        <p class="text-muted">هر لینک حدود {{ ttl_hours }} ساعت اعتبار دارد. می‌توانید بعداً از
+            <a class="text-link" href="/orders/recover">بازیابی سفارش</a>
+            {% if current_user %}یا <a class="text-link" href="/profile">کتابخانه من</a>{% endif %}
+            دوباره دریافت کنید.
+        </p>
+        {% if downloads %}
+        <ul class="list-unstyled">
+            {% for item in downloads %}
+            <li class="mb-3 p-3 border rounded">
+                <strong>{{ item.book.title }}</strong>
+                <div class="mt-2">
+                    <a class="btn" href="{{ item.url }}">دانلود فایل</a>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p>فایل هنوز آماده نیست. با پشتیبانی تماس بگیرید.</p>
+        {% endif %}
+
+        {% elif pending %}
+        <div class="alert alert-warning">
+            سفارش شماره <strong>{{ order.id }}</strong> در انتظار تأیید پرداخت است.
+            اگر پرداخت را انجام داده‌اید، چند لحظه بعد این صفحه را رفرش کنید یا از
+            <a href="/orders/recover">بازیابی سفارش</a> استفاده کنید.
+        </div>
+        {% elif failed %}
+        <div class="alert alert-danger">
+            پرداخت سفارش <strong>{{ order.id }}</strong> ناموفق بود.
+            می‌توانید دوباره از <a href="/cart">سبد خرید</a> اقدام کنید.
+        </div>
+        {% else %}
+        <div class="alert alert-info">وضعیت سفارش: {{ order.status.value }}</div>
+        {% endif %}
+
+        <p class="mt-4">
+            <a href="/search" class="btn">ادامه خرید</a>
+            <a href="/orders/recover" class="btn checkout_btn">بازیابی سفارش دیگر</a>
+        </p>
+    </div>
+</section>
+{% endblock %}

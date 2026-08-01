@@ -36,8 +36,12 @@ from app.models import (
     HERO_FOLDER,
     HERO_MIN_SIZE,
     HERO_RECOMMENDED_SIZE,
+    DOWNLOAD_LINK_TTL_HOURS_DEFAULT,
+    DOWNLOAD_LINK_TTL_HOURS_KEY,
     AppSetting,
     Book,
+    Coupon,
+    DiscountType,
     HeroSlide,
     Order,
     OrderItem,
@@ -402,13 +406,9 @@ async def _user_library(db: AsyncSession, user_id: int) -> list[Book]:
 
 
 def _ftp_client():
-    return aioftp.Client.context(
-        host=settings.FTP_HOST,
-        port=settings.FTP_PORT,
-        user=settings.FTP_USER,
-        password=settings.FTP_PASS,
-        socket_timeout=30,
-    )
+    from app.services.ftp_client import ftp_client
+
+    return ftp_client()
 
 
 async def _try_migrate_folder_files(
@@ -1731,5 +1731,394 @@ async def admin_hero_delete(
     await db.commit()
     return RedirectResponse(
         url="/admin/hero?msg=deleted",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Coupons & download settings
+# ---------------------------------------------------------------------------
+
+
+def _parse_admin_dt(raw: str | None) -> datetime | None:
+    value = (raw or "").strip()
+    if not value:
+        return None
+    # datetime-local: 2026-08-01T14:30
+    try:
+        if "T" in value:
+            dt = datetime.fromisoformat(value)
+        else:
+            dt = datetime.strptime(value, "%Y-%m-%d %H:%M")
+        if dt.tzinfo is None:
+            # Treat as Asia/Tehran wall time ≈ UTC+3:30 without zoneinfo dependency
+            dt = dt.replace(tzinfo=timezone(timedelta(hours=3, minutes=30)))
+        return dt.astimezone(timezone.utc)
+    except ValueError:
+        return None
+
+
+def _dt_local_value(dt: datetime | None) -> str:
+    if not dt:
+        return ""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    local = dt.astimezone(timezone(timedelta(hours=3, minutes=30)))
+    return local.strftime("%Y-%m-%dT%H:%M")
+
+
+@router.get("/coupons", response_class=HTMLResponse)
+async def admin_coupons(
+    request: Request,
+    page: int = 1,
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    page = max(1, page)
+    total = await db.scalar(select(func.count()).select_from(Coupon)) or 0
+    total_pages = max(1, ceil(total / PAGE_SIZE)) if total else 0
+    result = await db.execute(
+        select(Coupon)
+        .order_by(desc(Coupon.created_at), desc(Coupon.id))
+        .offset((page - 1) * PAGE_SIZE)
+        .limit(PAGE_SIZE)
+    )
+    coupons = result.scalars().all()
+
+    ttl_row = (
+        await db.execute(
+            select(AppSetting).where(AppSetting.key == DOWNLOAD_LINK_TTL_HOURS_KEY)
+        )
+    ).scalar_one_or_none()
+    ttl_hours = DOWNLOAD_LINK_TTL_HOURS_DEFAULT
+    if ttl_row:
+        try:
+            ttl_hours = int(ttl_row.value)
+        except ValueError:
+            pass
+
+    return templates.TemplateResponse(
+        "admin/coupons.html",
+        {
+            "request": request,
+            "admin": admin,
+            "coupons": coupons,
+            "page": page,
+            "total_pages": total_pages,
+            "total": total,
+            "ttl_hours": ttl_hours,
+            "message": request.query_params.get("msg"),
+        },
+    )
+
+
+@router.post("/settings/download-ttl")
+async def admin_save_download_ttl(
+    hours: str = Form(...),
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    try:
+        value = max(1, min(int(hours), 24 * 30))
+    except ValueError:
+        return RedirectResponse(
+            url="/admin/coupons?msg=ttl_invalid",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    row = (
+        await db.execute(
+            select(AppSetting).where(AppSetting.key == DOWNLOAD_LINK_TTL_HOURS_KEY)
+        )
+    ).scalar_one_or_none()
+    if row:
+        row.value = str(value)
+    else:
+        db.add(AppSetting(key=DOWNLOAD_LINK_TTL_HOURS_KEY, value=str(value)))
+    await db.commit()
+    return RedirectResponse(
+        url="/admin/coupons?msg=ttl_saved",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.get("/coupons/new", response_class=HTMLResponse)
+async def admin_coupon_new(
+    request: Request,
+    admin: User = Depends(require_admin),
+):
+    return templates.TemplateResponse(
+        "admin/coupon_edit.html",
+        {
+            "request": request,
+            "admin": admin,
+            "coupon": None,
+            "error": None,
+            "form": {
+                "code": "",
+                "discount_type": "PERCENT",
+                "amount": "",
+                "max_uses": "",
+                "min_order_amount": "",
+                "starts_at": "",
+                "ends_at": "",
+                "is_active": True,
+            },
+        },
+    )
+
+
+@router.get("/coupons/{coupon_id}", response_class=HTMLResponse)
+async def admin_coupon_edit(
+    coupon_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    coupon = (
+        await db.execute(select(Coupon).where(Coupon.id == coupon_id))
+    ).scalar_one_or_none()
+    if not coupon:
+        raise HTTPException(status_code=404)
+    return templates.TemplateResponse(
+        "admin/coupon_edit.html",
+        {
+            "request": request,
+            "admin": admin,
+            "coupon": coupon,
+            "error": None,
+            "form": {
+                "code": coupon.code,
+                "discount_type": coupon.discount_type.value,
+                "amount": str(coupon.amount),
+                "max_uses": "" if coupon.max_uses is None else str(coupon.max_uses),
+                "min_order_amount": (
+                    ""
+                    if coupon.min_order_amount is None
+                    else str(int(coupon.min_order_amount))
+                ),
+                "starts_at": _dt_local_value(coupon.starts_at),
+                "ends_at": _dt_local_value(coupon.ends_at),
+                "is_active": coupon.is_active,
+            },
+        },
+    )
+
+
+async def _save_coupon_from_form(
+    db: AsyncSession,
+    coupon: Coupon | None,
+    *,
+    code: str,
+    discount_type: str,
+    amount: str,
+    max_uses: str,
+    min_order_amount: str,
+    starts_at: str,
+    ends_at: str,
+    is_active: str | None,
+) -> tuple[Coupon | None, str | None]:
+    code_norm = (code or "").strip().upper()
+    if not code_norm:
+        return None, "کد تخفیف الزامی است"
+    try:
+        dtype = DiscountType(discount_type)
+    except ValueError:
+        return None, "نوع تخفیف نامعتبر است"
+    try:
+        amt = Decimal(amount)
+        if amt <= 0:
+            raise InvalidOperation
+        if dtype == DiscountType.PERCENT and amt > 100:
+            return None, "درصد تخفیف نمی‌تواند بیشتر از ۱۰۰ باشد"
+    except (InvalidOperation, ValueError):
+        return None, "مقدار تخفیف نامعتبر است"
+
+    max_uses_val = None
+    if (max_uses or "").strip():
+        try:
+            max_uses_val = int(max_uses)
+            if max_uses_val < 1:
+                return None, "سقف استفاده باید حداقل ۱ باشد"
+        except ValueError:
+            return None, "سقف استفاده نامعتبر است"
+
+    min_amt = None
+    if (min_order_amount or "").strip():
+        try:
+            min_amt = Decimal(min_order_amount)
+            if min_amt < 0:
+                return None, "حداقل مبلغ سفارش نامعتبر است"
+        except (InvalidOperation, ValueError):
+            return None, "حداقل مبلغ سفارش نامعتبر است"
+
+    starts = _parse_admin_dt(starts_at)
+    ends = _parse_admin_dt(ends_at)
+    if starts and ends and ends <= starts:
+        return None, "پایان اعتبار باید بعد از شروع باشد"
+
+    dup = await db.execute(
+        select(Coupon).where(
+            Coupon.code == code_norm,
+            Coupon.id != (coupon.id if coupon else -1),
+        )
+    )
+    if dup.scalar_one_or_none():
+        return None, "این کد قبلاً ثبت شده است"
+
+    if coupon is None:
+        coupon = Coupon(used_count=0)
+        db.add(coupon)
+
+    coupon.code = code_norm
+    coupon.discount_type = dtype
+    coupon.amount = amt
+    coupon.max_uses = max_uses_val
+    coupon.min_order_amount = min_amt
+    coupon.starts_at = starts
+    coupon.ends_at = ends
+    coupon.is_active = bool(is_active)
+    await db.commit()
+    await db.refresh(coupon)
+    return coupon, None
+
+
+@router.post("/coupons/new")
+async def admin_coupon_create(
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+    code: str = Form(...),
+    discount_type: str = Form(...),
+    amount: str = Form(...),
+    max_uses: str = Form(""),
+    min_order_amount: str = Form(""),
+    starts_at: str = Form(""),
+    ends_at: str = Form(""),
+    is_active: str | None = Form(None),
+):
+    coupon, err = await _save_coupon_from_form(
+        db,
+        None,
+        code=code,
+        discount_type=discount_type,
+        amount=amount,
+        max_uses=max_uses,
+        min_order_amount=min_order_amount,
+        starts_at=starts_at,
+        ends_at=ends_at,
+        is_active=is_active,
+    )
+    if err:
+        return templates.TemplateResponse(
+            "admin/coupon_edit.html",
+            {
+                "request": request,
+                "admin": admin,
+                "coupon": None,
+                "error": err,
+                "form": {
+                    "code": code,
+                    "discount_type": discount_type,
+                    "amount": amount,
+                    "max_uses": max_uses,
+                    "min_order_amount": min_order_amount,
+                    "starts_at": starts_at,
+                    "ends_at": ends_at,
+                    "is_active": bool(is_active),
+                },
+            },
+            status_code=400,
+        )
+    return RedirectResponse(
+        url=f"/admin/coupons/{coupon.id}?msg=created",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/coupons/{coupon_id}")
+async def admin_coupon_update(
+    coupon_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+    code: str = Form(...),
+    discount_type: str = Form(...),
+    amount: str = Form(...),
+    max_uses: str = Form(""),
+    min_order_amount: str = Form(""),
+    starts_at: str = Form(""),
+    ends_at: str = Form(""),
+    is_active: str | None = Form(None),
+):
+    coupon = (
+        await db.execute(select(Coupon).where(Coupon.id == coupon_id))
+    ).scalar_one_or_none()
+    if not coupon:
+        raise HTTPException(status_code=404)
+    saved, err = await _save_coupon_from_form(
+        db,
+        coupon,
+        code=code,
+        discount_type=discount_type,
+        amount=amount,
+        max_uses=max_uses,
+        min_order_amount=min_order_amount,
+        starts_at=starts_at,
+        ends_at=ends_at,
+        is_active=is_active,
+    )
+    if err:
+        return templates.TemplateResponse(
+            "admin/coupon_edit.html",
+            {
+                "request": request,
+                "admin": admin,
+                "coupon": coupon,
+                "error": err,
+                "form": {
+                    "code": code,
+                    "discount_type": discount_type,
+                    "amount": amount,
+                    "max_uses": max_uses,
+                    "min_order_amount": min_order_amount,
+                    "starts_at": starts_at,
+                    "ends_at": ends_at,
+                    "is_active": bool(is_active),
+                },
+            },
+            status_code=400,
+        )
+    return RedirectResponse(
+        url=f"/admin/coupons/{saved.id}?msg=saved",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/coupons/{coupon_id}/delete")
+async def admin_coupon_delete(
+    coupon_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    coupon = (
+        await db.execute(select(Coupon).where(Coupon.id == coupon_id))
+    ).scalar_one_or_none()
+    if not coupon:
+        raise HTTPException(status_code=404)
+    # Soft-delete if referenced by orders
+    used = await db.scalar(
+        select(func.count()).select_from(Order).where(Order.coupon_id == coupon_id)
+    )
+    if used:
+        coupon.is_active = False
+        await db.commit()
+        return RedirectResponse(
+            url="/admin/coupons?msg=deactivated",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    await db.delete(coupon)
+    await db.commit()
+    return RedirectResponse(
+        url="/admin/coupons?msg=deleted",
         status_code=status.HTTP_303_SEE_OTHER,
     )

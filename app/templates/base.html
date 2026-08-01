@@ -36,6 +36,35 @@
             background: #cbd5e1;
             border-radius: 4px;
         }
+        #back-top {
+            display: none;
+        }
+        #sticky-header-spacer {
+            width: 100%;
+            pointer-events: none;
+        }
+        a:hover {
+            color: #00a4a6;
+        }
+        /* Content links must stay readable on white backgrounds (theme sets a:hover to white) */
+        main a:not(.btn):not(.white-btn):not(.library-download-btn):not(.checkout_btn):hover,
+        main a:not(.btn):not(.white-btn):not(.library-download-btn):not(.checkout_btn):focus {
+            color: #00a4a6 !important;
+        }
+        main a.text-link,
+        .checkout-page a.text-link,
+        .recover-page a,
+        .order-thanks-page a:not(.btn) {
+            color: #00a4a6 !important;
+            font-weight: 600;
+        }
+        main a.text-link:hover,
+        .checkout-page a.text-link:hover,
+        .recover-page a:hover,
+        .order-thanks-page a:not(.btn):hover {
+            color: #02787a !important;
+            text-decoration: underline !important;
+        }
         body {
             font-family: 'IRANSans', Tahoma, sans-serif;
             text-align: right;
@@ -1636,7 +1665,7 @@
     <script src="{{ url_for('static', path='js/jquery.counterup.min.js') }}"></script>
     <script src="{{ url_for('static', path='js/waypoints.min.js') }}"></script>
     <script src="{{ url_for('static', path='js/plugins.js') }}"></script>
-    <script src="{{ url_for('static', path='js/main.js') }}?v=heroDots1"></script>
+    <script src="{{ url_for('static', path='js/main.js') }}?v=stickyScroll2"></script>
     <script>
     (function () {
         function applyAutoDir(el) {

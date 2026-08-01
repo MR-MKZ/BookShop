@@ -82,13 +82,7 @@
                 </table>
                 <div class="checkout_btn_inner float-right">
                     <a class="btn" href="/search">ادامه خرید</a>
-                    {% if current_user %}
-                        <form method="post" action="/cart/checkout" style="display:inline;">
-                            <button type="submit" class="btn checkout_btn">تسویه حساب</button>
-                        </form>
-                    {% else %}
-                        <a class="btn checkout_btn" href="/auth/login?next=/cart">ورود برای پرداخت</a>
-                    {% endif %}
+                    <a class="btn checkout_btn" href="/checkout">تسویه حساب</a>
                 </div>
                 {% else %}
                 <div class="text-center py-5">

@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}بازیابی سفارش — کابانا{% endblock %}
+
+{% block breadcrumb %}
+<div class="breadcrumb-items">
+    <div class="row">
+        <ul class="breadcrumb">
+            <li><a href="/" class="breadcrumb-link">صفحه اصلی</a></li>
+            <li class="chevron"><span class="fa fa-chevron-left"></span></li>
+            <li><span class="breadcrumb-active">بازیابی سفارش</span></li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+    .recover-page {
+        padding-top: 24px !important;
+        padding-bottom: 48px !important;
+    }
+    .recover-page .recover-card {
+        max-width: 520px;
+        margin: 0 auto;
+        background: #fff;
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 22px 20px;
+    }
+    .recover-page h1 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin: 0 0 10px;
+    }
+    .recover-page .recover-lead {
+        font-size: 0.92rem;
+        color: #64748b;
+        line-height: 1.7;
+        margin-bottom: 18px;
+    }
+    .recover-page label {
+        display: block;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #334155;
+        margin-bottom: 6px;
+    }
+    .recover-page .form-control {
+        height: 44px;
+        border-radius: 10px;
+        border: 1px solid #e2e8f0;
+        margin-bottom: 14px;
+    }
+    .recover-page .form-control:focus {
+        border-color: #00a4a6;
+        box-shadow: 0 0 0 3px rgba(0, 164, 166, 0.12);
+        text-align: left !important;
+    }
+    .recover-page .recover-submit {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        min-height: 46px;
+        border-radius: 12px !important;
+        line-height: 1.2 !important;
+        overflow: visible !important;
+        font-weight: 700 !important;
+    }
+    .recover-page .recover-submit::before {
+        display: none !important;
+        content: none !important;
+    }
+    .recover-page .recover-footer {
+        margin-top: 18px;
+        text-align: center;
+        font-size: 0.92rem;
+        color: #475569;
+    }
+    .recover-page .recover-footer a,
+    .recover-page a.text-link {
+        color: #00a4a6 !important;
+        font-weight: 700;
+        text-decoration: underline !important;
+    }
+    .recover-page .recover-footer a:hover,
+    .recover-page .recover-footer a:focus,
+    .recover-page a.text-link:hover,
+    .recover-page a.text-link:focus {
+        color: #02787a !important;
+    }
+    .recover-page .alert {
+        border-radius: 10px;
+        margin-bottom: 14px;
+    }
+</style>
+
+<section class="cart_area section-padding recover-page">
+    <div class="container">
+        <div class="recover-card">
+            <h1>بازیابی لینک دانلود</h1>
+            <p class="recover-lead">
+                اگر پس از پرداخت صفحه دانلود را ندیدید، شماره سفارش و ایمیل یا تلفنی که هنگام خرید وارد کرده‌اید را وارد کنید.
+            </p>
+
+            {% if error %}
+            <div class="alert alert-danger">{{ error }}</div>
+            {% endif %}
+
+            <form method="post" action="/orders/recover">
+                <label for="order_id">شماره سفارش</label>
+                <input type="text" class="form-control" id="order_id" name="order_id"
+                       value="{{ order_id or '' }}" required dir="ltr" inputmode="numeric"
+                       autocomplete="off">
+
+                <label for="contact">ایمیل یا شماره تلفن</label>
+                <input type="text" class="form-control" id="contact" name="contact"
+                       value="{{ contact or '' }}" required dir="ltr"
+                       placeholder="email@example.com یا 0912…"
+                       autocomplete="username">
+
+                <button type="submit" class="btn recover-submit">مشاهده سفارش</button>
+            </form>
+
+            {% if current_user %}
+            <p class="recover-footer">
+                یا به <a class="text-link" href="/profile">کتابخانه من</a> بروید.
+            </p>
+            {% else %}
+            <p class="recover-footer">
+                حساب دارید؟ <a class="text-link" href="/auth/login?next=/orders/recover">وارد شوید</a>
+            </p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+{% endblock %}

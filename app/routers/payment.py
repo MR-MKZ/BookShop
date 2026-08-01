@@ -1,110 +1,73 @@
-"""Payment flow with Zibal sandbox."""
+"""Payment callbacks and legacy buy redirect."""
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import RedirectResponse
-from sqlalchemy import and_, select
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.auth import get_current_user
 from app.database import get_async_db
-from app.models import Book, Order, OrderItem, OrderStatus, User
-from app.services import zibal
+from app.models import Order, OrderStatus
+from app.routers.cart import CART_COOKIE
+from app.routers.checkout import finalize_paid_order
+from app.services.checkout_helpers import ORDER_ACCESS_COOKIE, ORDER_ACCESS_COOKIE_MAX_AGE
+from app.services.payments import PaymentError, get_gateway
+from app.utils.security import cookie_kwargs
 
 router = APIRouter(prefix="/payment", tags=["payment"])
 
 
+def _thanks_redirect(order: Order) -> RedirectResponse:
+    token = order.access_token or ""
+    url = f"/orders/{order.id}/thanks"
+    if token:
+        url += f"?t={token}"
+    response = RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
+    if token:
+        response.set_cookie(
+            ORDER_ACCESS_COOKIE,
+            token,
+            **cookie_kwargs(max_age=ORDER_ACCESS_COOKIE_MAX_AGE),
+        )
+    return response
+
+
 @router.post("/buy/{book_id}")
-async def buy_book(
-    book_id: int,
-    request: Request,
-    db: AsyncSession = Depends(get_async_db),
-    current_user: User = Depends(get_current_user),
-):
-    result = await db.execute(select(Book).where(Book.id == book_id, Book.is_active == True))
-    book = result.scalar_one_or_none()
-    if not book:
-        raise HTTPException(status_code=404, detail="کتاب یافت نشد")
-
-    if not book.has_pdf:
-        raise HTTPException(status_code=400, detail="فایل این کتاب هنوز آماده فروش نیست")
-
-    # Already purchased?
-    owned = await db.execute(
-        select(OrderItem)
-        .join(Order)
-        .where(
-            and_(
-                Order.user_id == current_user.id,
-                Order.status == OrderStatus.PAID,
-                OrderItem.book_id == book_id,
-            )
-        )
-    )
-    if owned.scalar_one_or_none():
-        return RedirectResponse(url="/profile", status_code=status.HTTP_303_SEE_OTHER)
-
-    amount = int(book.price or 0)
-    if amount <= 0:
-        # Free book — grant immediately
-        order = Order(
-            user_id=current_user.id,
-            status=OrderStatus.PAID,
-            total_amount=0,
-            paid_at=datetime.now(timezone.utc),
-        )
-        db.add(order)
-        await db.flush()
-        db.add(OrderItem(order_id=order.id, book_id=book.id, price=0, quantity=1))
-        await db.commit()
-        return RedirectResponse(url="/profile", status_code=status.HTTP_303_SEE_OTHER)
-
-    order = Order(
-        user_id=current_user.id,
-        status=OrderStatus.PENDING,
-        total_amount=amount,
-    )
-    db.add(order)
-    await db.flush()
-    db.add(OrderItem(order_id=order.id, book_id=book.id, price=amount, quantity=1))
-    await db.commit()
-    await db.refresh(order)
-
-    callback = str(request.base_url).rstrip("/") + "/payment/callback"
-    try:
-        data = await zibal.request_payment(
-            amount_toman=amount,
-            order_id=order.id,
-            description=f"خرید کتاب: {book.title}",
-            mobile=current_user.phone,
-            callback_url=callback,
-        )
-    except zibal.ZibalError as e:
-        order.status = OrderStatus.FAILED
-        await db.commit()
-        raise HTTPException(status_code=502, detail=str(e)) from e
-
-    track_id = data.get("trackId")
-    order.payment_gateway_transaction_id = str(track_id)
-    await db.commit()
-
+async def buy_book(book_id: int):
+    """Legacy instant-buy → checkout (guest-friendly)."""
     return RedirectResponse(
-        url=zibal.payment_start_url(track_id),
-        status_code=status.HTTP_303_SEE_OTHER,
+        url=f"/checkout/buy-now/{book_id}",
+        status_code=status.HTTP_307_TEMPORARY_REDIRECT,
     )
 
 
-@router.get("/callback")
-@router.post("/callback")
-async def payment_callback(
+def _verify_matches_order(order: Order, verify: dict) -> bool:
+    """Bind gateway verify payload to the DB order (amount + order id)."""
+    expected_rial = int(Decimal(str(order.total_amount))) * 10
+    amount = verify.get("amount_rial")
+    if amount is not None:
+        try:
+            if int(amount) != expected_rial:
+                return False
+        except (TypeError, ValueError):
+            return False
+
+    raw_oid = verify.get("order_id")
+    if raw_oid is not None and str(raw_oid).strip() != "":
+        if str(raw_oid).strip() != str(order.id):
+            return False
+    return True
+
+
+async def _handle_callback(
     request: Request,
-    db: AsyncSession = Depends(get_async_db),
+    db: AsyncSession,
+    gateway_id: str | None = None,
 ):
-    """Zibal redirects here after payment (GET or POST)."""
     params = dict(request.query_params)
     if request.method == "POST":
         try:
@@ -115,10 +78,11 @@ async def payment_callback(
 
     success = str(params.get("success", ""))
     track_id = params.get("trackId") or params.get("track_id")
-    order_id = params.get("orderId") or params.get("order_id")
+    cart_sid = request.cookies.get(CART_COOKIE)
 
+    # Only trust trackId stored on the order — never promote a client orderId alone
     if not track_id:
-        return RedirectResponse(url="/profile?pay=error", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/orders/recover", status_code=status.HTTP_303_SEE_OTHER)
 
     result = await db.execute(
         select(Order)
@@ -127,48 +91,59 @@ async def payment_callback(
     )
     order = result.scalar_one_or_none()
 
-    if not order and order_id:
-        result = await db.execute(
-            select(Order)
-            .options(selectinload(Order.items))
-            .where(Order.id == int(order_id))
-        )
-        order = result.scalar_one_or_none()
-
     if not order:
-        return RedirectResponse(url="/profile?pay=error", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(url="/orders/recover", status_code=status.HTTP_303_SEE_OTHER)
+
+    gw_id = gateway_id or order.payment_gateway
+    try:
+        gateway = get_gateway(gw_id)
+    except PaymentError:
+        return _thanks_redirect(order)
 
     if order.status == OrderStatus.PAID:
-        return RedirectResponse(url="/profile?pay=ok", status_code=status.HTTP_303_SEE_OTHER)
+        return _thanks_redirect(order)
 
     if success not in ("1", "true", "True"):
         order.status = OrderStatus.FAILED
         await db.commit()
-        return RedirectResponse(url="/profile?pay=failed", status_code=status.HTTP_303_SEE_OTHER)
+        return _thanks_redirect(order)
 
     try:
-        verify = await zibal.verify_payment(track_id)
-    except zibal.ZibalError:
+        verify = await gateway.verify_payment(track_id)
+    except PaymentError:
         order.status = OrderStatus.FAILED
         await db.commit()
-        return RedirectResponse(url="/profile?pay=failed", status_code=status.HTTP_303_SEE_OTHER)
+        return _thanks_redirect(order)
 
-    order.status = OrderStatus.PAID
-    order.paid_at = datetime.now(timezone.utc)
-    order.payment_gateway_ref_id = str(verify.get("refNumber") or "")
+    if not _verify_matches_order(order, verify):
+        order.status = OrderStatus.FAILED
+        await db.commit()
+        return _thanks_redirect(order)
 
-    # Clear purchased books from cart
-    from app.models import Cart
-    from sqlalchemy import delete
-
-    book_ids = [item.book_id for item in order.items]
-    if book_ids:
-        await db.execute(
-            delete(Cart).where(
-                and_(Cart.user_id == order.user_id, Cart.book_id.in_(book_ids))
-            )
-        )
-
+    await finalize_paid_order(
+        db,
+        order,
+        ref_id=str(verify.get("ref_id") or ""),
+        cart_session_id=cart_sid,
+    )
     await db.commit()
+    return _thanks_redirect(order)
 
-    return RedirectResponse(url="/profile?pay=ok", status_code=status.HTTP_303_SEE_OTHER)
+
+@router.get("/callback")
+@router.post("/callback")
+async def payment_callback(
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+):
+    return await _handle_callback(request, db)
+
+
+@router.get("/callback/{gateway_id}")
+@router.post("/callback/{gateway_id}")
+async def payment_callback_gateway(
+    gateway_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+):
+    return await _handle_callback(request, db, gateway_id=gateway_id)

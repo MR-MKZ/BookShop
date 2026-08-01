@@ -67,18 +67,13 @@
                                 {% else %}
                                     <span class="status-pill is-disabled">خریداری شده — فایل به‌زودی</span>
                                 {% endif %}
-                            {% elif not current_user %}
-                                <a href="/auth/login?next=/book/{{ book.id }}" class="white-btn">ورود برای خرید</a>
-                                <form action="/cart/add/{{ book.id }}" method="post">
-                                    <button type="submit" class="library-download-btn">افزودن به سبد</button>
-                                </form>
                             {% elif not book.has_pdf %}
                                 <span class="status-pill is-disabled">فعلاً موجود نیست</span>
                             {% else %}
                                 <form action="/cart/add/{{ book.id }}" method="post">
                                     <button type="submit" class="white-btn">افزودن به سبد خرید</button>
                                 </form>
-                                <form action="/payment/buy/{{ book.id }}" method="post">
+                                <form action="/checkout/buy-now/{{ book.id }}" method="post">
                                     <button type="submit" class="library-download-btn">خرید سریع</button>
                                 </form>
                             {% endif %}
