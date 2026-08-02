@@ -121,3 +121,9 @@ async def health():
 async def domain_verification_file():
     path = os.path.join(static_path, "29498328.txt")
     return FileResponse(path, media_type="text/plain")
+
+
+@app.get("/googlead705c5e6dd77f35.html")
+async def google_site_verification_file():
+    path = os.path.join(static_path, "googlead705c5e6dd77f35.html")
+    return FileResponse(path, media_type="text/html")
