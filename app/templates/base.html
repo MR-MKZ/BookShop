@@ -101,10 +101,17 @@
         a:hover {
             color: #00a4a6;
         }
-        /* Content links must stay readable on white backgrounds (theme sets a:hover to white) */
-        main a:not(.btn):not(.white-btn):not(.library-download-btn):not(.checkout_btn):hover,
-        main a:not(.btn):not(.white-btn):not(.library-download-btn):not(.checkout_btn):focus {
+        /* Content links must stay readable on white backgrounds (theme sets a:hover to white).
+           Exclude .nav-link — active tabs use teal bg + white text; forcing teal text hides them. */
+        main a:not(.btn):not(.white-btn):not(.library-download-btn):not(.checkout_btn):not(.nav-link):hover,
+        main a:not(.btn):not(.white-btn):not(.library-download-btn):not(.checkout_btn):not(.nav-link):focus {
             color: #00a4a6 !important;
+        }
+        .nav-button .nav-tabs .nav-link.active,
+        .nav-button .nav-tabs .nav-link.active:hover,
+        .nav-button .nav-tabs .nav-link.active:focus {
+            color: #fff !important;
+            background-color: #00a4a6;
         }
         main a.text-link,
         .checkout-page a.text-link,
