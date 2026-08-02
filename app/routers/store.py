@@ -1,8 +1,10 @@
 from math import ceil
+import json
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 from sqlalchemy import and_, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -44,11 +46,14 @@ async def _download_token_for(
     )
 
 
+def _tojson(value) -> Markup:
+    return Markup(json.dumps(value, ensure_ascii=False))
+
+
 templates.env.globals["cover_url"] = _cover_url
 templates.env.globals["format_price"] = format_price
 templates.env.globals["round_toman"] = round_toman
-
-
+templates.env.filters["tojson"] = _tojson
 @router.get("/")
 async def home(
     request: Request,

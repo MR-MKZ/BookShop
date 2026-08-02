@@ -1,0 +1,73 @@
+{# Social / SEO meta — expects request in context.
+   Optional overrides via caller sets before include:
+   meta_title, meta_description, meta_url, meta_image, meta_image_alt,
+   meta_image_width, meta_image_height, og_type, twitter_card, robots_content,
+   json_ld (raw JSON string), skip_json_ld (truthy to omit default WebSite schema)
+#}
+{% set site_name = "لامابوک" %}
+{% set site_tagline = "مرجع دانلود کتاب‌های الکترونیکی خارجی" %}
+{% set site_description = "خرید و دانلود کتاب‌های الکترونیکی خارجی در موضوعات متنوع؛ دسترسی آسان به هزاران ایبوک ارزشمند." %}
+{% set site_origin = (request.base_url|string).rstrip('/') %}
+{% set _title = meta_title if meta_title is defined else (site_name ~ " — " ~ site_tagline) %}
+{% set _desc = meta_description if meta_description is defined else site_description %}
+{% set _url = meta_url if meta_url is defined else (site_origin ~ request.url.path) %}
+{% set _image = meta_image if meta_image is defined else (site_origin ~ "/static/img/logo/banner.png") %}
+{% set _image_alt = meta_image_alt if meta_image_alt is defined else site_name %}
+{% set _img_w = meta_image_width if meta_image_width is defined else 1424 %}
+{% set _img_h = meta_image_height if meta_image_height is defined else 752 %}
+{% set _og_type = og_type if og_type is defined else "website" %}
+{% set _tw_card = twitter_card if twitter_card is defined else "summary_large_image" %}
+{% set _robots = robots_content if robots_content is defined else "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" %}
+
+<meta name="description" content="{{ _desc }}">
+<meta name="robots" content="{{ _robots }}">
+<meta name="author" content="{{ site_name }}">
+<meta name="theme-color" content="#00a4a6">
+<meta name="application-name" content="{{ site_name }}">
+<link rel="canonical" href="{{ _url }}">
+
+{# Open Graph — Telegram, WhatsApp, LinkedIn, Facebook, Discord #}
+<meta property="og:type" content="{{ _og_type }}">
+<meta property="og:site_name" content="{{ site_name }}">
+<meta property="og:locale" content="fa_IR">
+<meta property="og:title" content="{{ _title }}">
+<meta property="og:description" content="{{ _desc }}">
+<meta property="og:url" content="{{ _url }}">
+<meta property="og:image" content="{{ _image }}">
+<meta property="og:image:secure_url" content="{{ _image }}">
+<meta property="og:image:alt" content="{{ _image_alt }}">
+{% if _img_w %}<meta property="og:image:width" content="{{ _img_w }}">{% endif %}
+{% if _img_h %}<meta property="og:image:height" content="{{ _img_h }}">{% endif %}
+<meta property="og:image:type" content="image/png">
+{# Twitter / X #}
+<meta name="twitter:card" content="{{ _tw_card }}">
+<meta name="twitter:title" content="{{ _title }}">
+<meta name="twitter:description" content="{{ _desc }}">
+<meta name="twitter:image" content="{{ _image }}">
+<meta name="twitter:image:alt" content="{{ _image_alt }}">
+
+{# Apple / mobile #}
+<meta name="apple-mobile-web-app-title" content="{{ site_name }}">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="{{ site_origin }}/static/img/logo/favicon.png">
+
+{% if json_ld is defined and json_ld %}
+<script type="application/ld+json">{{ json_ld|safe }}</script>
+{% elif not skip_json_ld %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "لامابوک",
+  "alternateName": "Lamabook",
+  "url": "{{ site_origin }}",
+  "description": "خرید و دانلود کتاب‌های الکترونیکی خارجی در موضوعات متنوع؛ دسترسی آسان به هزاران ایبوک ارزشمند.",
+  "inLanguage": "fa-IR",
+  "potentialAction": {
+    "@type": "SearchAction",
+    "target": "{{ site_origin }}/search?q={search_term_string}",
+    "query-input": "required name=search_term_string"
+  }
+}
+</script>
+{% endif %}

@@ -1,7 +1,51 @@
 {% extends "base.html" %}
 {% from "macros.html" import dual_price %}
 
-{% block title %}{{ book.title or 'جزئیات کتاب' }} — کابانا{% endblock %}
+{% block title %}{{ book.title or 'جزئیات کتاب' }} — لامابوک{% endblock %}
+
+{% block meta_description -%}
+{%- if book.description -%}
+{{ book.description|striptags|truncate(160, True, '…') }}
+{%- else -%}
+دانلود و خرید کتاب «{{ book.title or 'بدون عنوان' }}»{% if book.author %} اثر {{ book.author }}{% endif %} از لامابوک — مرجع دانلود کتاب‌های الکترونیکی خارجی.
+{%- endif -%}
+{%- endblock %}
+
+{% block og_type %}book{% endblock %}
+{% block og_image %}{{ site_origin }}/media/proxy/cover/{{ book.folder_name }}/{{ book.cover_filename or 'cover.jpg' }}{% endblock %}
+{% block og_image_alt %}جلد کتاب {{ book.title or 'لامابوک' }}{% endblock %}
+{% block og_image_size %}{% endblock %}
+{% block twitter_card %}summary_large_image{% endblock %}
+
+{% block json_ld %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Book",
+  "name": {{ (book.title or 'بدون عنوان')|tojson }},
+  {% if book.title_en %}"alternateName": {{ book.title_en|tojson }},{% endif %}
+  {% if book.author %}"author": { "@type": "Person", "name": {{ book.author|tojson }} },{% endif %}
+  {% if book.description %}"description": {{ book.description|striptags|truncate(300, True, '')|tojson }},{% endif %}
+  {% if book.isbn %}"isbn": {{ book.isbn|tojson }},{% endif %}
+  {% if book.publisher %}"publisher": { "@type": "Organization", "name": {{ book.publisher|tojson }} },{% endif %}
+  {% if book.language %}"inLanguage": {{ book.language|tojson }},{% endif %}
+  {% if book.pages %}"numberOfPages": {{ book.pages }},{% endif %}
+  "image": {{ (site_origin ~ '/media/proxy/cover/' ~ book.folder_name ~ '/' ~ (book.cover_filename or 'cover.jpg'))|tojson }},
+  "url": {{ (site_origin ~ '/book/' ~ book.id)|tojson }},
+  "offers": {
+    "@type": "Offer",
+    "url": {{ (site_origin ~ '/book/' ~ book.id)|tojson }},
+    "availability": "https://schema.org/InStock",
+    "priceCurrency": "IRR"
+  },
+  "provider": {
+    "@type": "Organization",
+    "name": "لامابوک",
+    "url": {{ site_origin|tojson }}
+  }
+}
+</script>
+{% endblock %}
 
 {% block breadcrumb %}
 <div class="breadcrumb-items">

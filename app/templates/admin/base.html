@@ -3,7 +3,10 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}پنل ادمین{% endblock %} — کابانا</title>
+    <title>{% block title %}پنل ادمین{% endblock %} — لامابوک</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#1e293b">
+    <meta name="description" content="پنل مدیریت لامابوک">
     <style>
         :root { --bg: #f4f6f8; --side: #1e293b; --accent: #50b848; --text: #1e293b; --mobile-bar: 52px; }
         * { box-sizing: border-box; }
@@ -470,12 +473,12 @@
     <button type="button" class="menu-toggle" id="admin-menu-toggle" aria-label="منو" aria-expanded="false" aria-controls="admin-sidebar">
         <span></span><span></span><span></span>
     </button>
-    <div class="mobile-brand">کابانا ادمین</div>
+    <div class="mobile-brand">لامابوک ادمین</div>
 </header>
 <div class="sidebar-backdrop" id="admin-sidebar-backdrop"></div>
 <div class="layout">
     <aside class="sidebar" id="admin-sidebar">
-        <div class="brand">کابانا ادمین</div>
+        <div class="brand">لامابوک ادمین</div>
         <nav class="sidebar-nav">
             <a href="/admin/" class="{% if request.url.path == '/admin/' %}active{% endif %}">داشبورد</a>
             <a href="/admin/books" class="{% if request.url.path.startswith('/admin/books') and '/new' not in request.url.path %}active{% endif %}">کتاب‌ها</a>

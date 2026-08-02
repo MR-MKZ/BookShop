@@ -73,8 +73,8 @@ async def stream_media(folder_name: str, filename: str):
         full_path = os.path.join(settings.MEDIA_ROOT, folder_name, filename)
         # Extra check for local path
         if not os.path.abspath(full_path).startswith(os.path.abspath(settings.MEDIA_ROOT)):
-             yield b""
-             return
+            yield b""
+            return
 
         if not os.path.exists(full_path):
             # Signal caller that file is missing by yielding nothing or handling exception

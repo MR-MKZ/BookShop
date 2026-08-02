@@ -20,8 +20,8 @@ _redoc = None if settings.is_production else "/redoc"
 _openapi = None if settings.is_production else "/openapi.json"
 
 app = FastAPI(
-    title="Kabana Book Store",
-    description="Digital Book Store",
+    title="لامابوک",
+    description="مرجع دانلود کتاب‌های الکترونیکی خارجی",
     version="1.0.0",
     docs_url=_docs,
     redoc_url=_redoc,

@@ -1,7 +1,17 @@
 {% extends "base.html" %}
 {% from "macros.html" import book_card, page_pagination %}
 
-{% block title %}جستجو{% if query %}: {{ query }}{% endif %} — کابانا{% endblock %}
+{% block title %}جستجو{% if query %}: {{ query }}{% endif %} — لامابوک{% endblock %}
+
+{% block meta_description %}
+{%- if query -%}
+نتایج جستجو برای «{{ query }}» در لامابوک — مرجع دانلود کتاب‌های الکترونیکی خارجی.
+{%- else -%}
+جستجو و دانلود کتاب‌های الکترونیکی خارجی در لامابوک؛ دسترسی آسان به هزاران ایبوک ارزشمند.
+{%- endif -%}
+{% endblock %}
+
+{% block canonical_url %}{{ site_origin }}/search{% if query %}?q={{ query|urlencode }}{% endif %}{% endblock %}
 
 {% block content %}
 <div class="slider-area">
