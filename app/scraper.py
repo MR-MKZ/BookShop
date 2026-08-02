@@ -8,6 +8,7 @@ import re
 import signal
 import socket
 import sys
+from urllib.parse import quote
 
 import aioftp
 import aiohttp
@@ -63,6 +64,8 @@ class BookScraper:
 
         self.known_urls: set[str] = set()
         self.known_content_keys: set[str] = set()
+        # Cover-token -> listing fields (ناشر/year) recovered from explore.php search
+        self._listing_meta_cache: dict[str, dict] = {}
         self.db_pool = None
         self.run_id: int | None = None
         self.pages_total = 0
@@ -354,35 +357,146 @@ class BookScraper:
         text = re.sub(r"[^\w\u0600-\u06ff\s]+", "", text, flags=re.UNICODE)
         return text.strip()
 
+    def _normalize_author(self, value: str | None) -> str:
+        author_n = self._normalize_text(value)
+        if author_n in {
+            "",
+            "unknown",
+            "unkown",
+            "n a",
+            "na",
+            "none",
+            "null",
+            "ناشناس",
+            "نامشخص",
+            "نامعلوم",
+        }:
+            return ""
+        return author_n
+
     def content_key(
         self,
         title_fa: str | None,
         title_en: str | None,
         author: str | None,
         isbn: str | None,
+        publisher: str | None = None,
+        year: str | None = None,
     ) -> str:
-        """Fingerprint for near-duplicate books (same title/ISBN across different URLs)."""
+        """Fingerprint for near-duplicate books (same title/ISBN across different URLs).
+
+        asbook often leaves detail-page ناشر empty while listing search shows the
+        real publisher string (issue # / month for magazines). Include publisher
+        and year when present. If identity is too weak (no ISBN, author, or
+        publisher), return "" so URL uniqueness alone applies.
+        """
         isbn_clean = re.sub(r"[\s\-]", "", (isbn or "").strip().lower())
         if isbn_clean and len(isbn_clean) >= 8:
             return f"isbn:{isbn_clean}"
 
         title = self._normalize_text(title_en) or self._normalize_text(title_fa)
-        author_n = self._normalize_text(author)
+        author_n = self._normalize_author(author)
+        publisher_n = self._normalize_text(publisher)
+        year_n = self._normalize_text(year)
         if not title:
             return ""
-        return f"ta:{title}|{author_n}"
+
+        if author_n:
+            if publisher_n or year_n:
+                return f"ta:{title}|{author_n}|{publisher_n}|{year_n}"
+            return f"ta:{title}|{author_n}"
+
+        if publisher_n:
+            return f"tp:{title}|{publisher_n}|{year_n}"
+
+        # e.g. magazine issues that share a title with empty detail metadata
+        return ""
+
+    @staticmethod
+    def _cover_search_token(image_url: str | None) -> str:
+        """Prefer cover md5 (unique); fall back to cover id."""
+        if not image_url:
+            return ""
+        md5 = re.search(r"[?&]md5=([A-Fa-f0-9]+)", image_url, re.I)
+        if md5:
+            return md5.group(1)
+        cover_id = re.search(r"[?&]id=(\d+)", image_url)
+        if cover_id:
+            return cover_id.group(1)
+        return ""
+
+    @staticmethod
+    def _parse_listing_card(card) -> dict:
+        meta: dict[str, str] = {}
+        for p in card.select("p"):
+            text = p.get_text(" ", strip=True)
+            if ":" not in text:
+                continue
+            key, _, value = text.partition(":")
+            key, value = key.strip(), value.strip()
+            if key.startswith("ناشر"):
+                meta["publisher"] = value
+            elif key.startswith("سال"):
+                meta["year"] = value
+            elif key.startswith("نویسند"):
+                meta["author"] = value
+        return meta
+
+    @staticmethod
+    def _urls_match(book_url: str, href: str, base_url: str) -> bool:
+        if not href:
+            return False
+        if not href.startswith("http"):
+            href = f"{base_url.rstrip('/')}/{href.lstrip('/')}"
+        return book_url.rstrip("/") == href.rstrip("/")
+
+    async def lookup_listing_meta(
+        self, session, book_url: str, image_url: str | None
+    ) -> dict:
+        """Recover ناشر / year from explore.php search (asbook detail bug workaround)."""
+        token = self._cover_search_token(image_url)
+        if not token:
+            return {}
+        if token in self._listing_meta_cache:
+            return self._listing_meta_cache[token]
+
+        search_url = f"{self.base_url}/explore.php?search={quote(token)}"
+        html = await self.fetch(session, search_url)
+        result: dict = {}
+        if html:
+            soup = BeautifulSoup(html, "lxml")
+            cards = soup.select("div.main-srch")
+            for card in cards:
+                link = card.select_one('a[href*="/book/"]')
+                href = link.get("href") if link else ""
+                if self._urls_match(book_url, href, self.base_url):
+                    result = self._parse_listing_card(card)
+                    break
+            if not result and len(cards) == 1:
+                result = self._parse_listing_card(cards[0])
+
+        self._listing_meta_cache[token] = result
+        return result
 
     async def load_known_content_keys(self):
         """Preload ISBN / title fingerprints so we skip asbook duplicates."""
         async with self.db_pool.acquire() as conn:
             rows = await conn.fetch(
-                "SELECT url, title, title_en, author, isbn FROM books"
+                """
+                SELECT url, title, title_en, author, isbn, publisher, publish_year
+                FROM books
+                """
             )
         for row in rows:
             if row["url"]:
                 self.known_urls.add(row["url"])
             key = self.content_key(
-                row["title"], row["title_en"], row["author"], row["isbn"]
+                row["title"],
+                row["title_en"],
+                row["author"],
+                row["isbn"],
+                row["publisher"],
+                row["publish_year"],
             )
             if key:
                 self.known_content_keys.add(key)
@@ -396,6 +510,8 @@ class BookScraper:
             data.get("title_en"),
             data.get("author"),
             data.get("isbn"),
+            data.get("publisher"),
+            data.get("year"),
         )
         if not key:
             return False
@@ -419,21 +535,32 @@ class BookScraper:
             title = self._normalize_text(data.get("title_en")) or self._normalize_text(
                 data.get("title_fa")
             )
-            author = self._normalize_text(data.get("author"))
-            if title:
-                exists = await conn.fetchval(
+            author = self._normalize_author(data.get("author"))
+            publisher = self._normalize_text(data.get("publisher"))
+            if title and (author or publisher):
+                # Compare via content_key in Python so punctuation in ناشر
+                # (issue # / month) matches preload normalization.
+                rows = await conn.fetch(
                     """
-                    SELECT 1 FROM books
+                    SELECT title, title_en, author, isbn, publisher, publish_year
+                    FROM books
                     WHERE lower(regexp_replace(coalesce(title_en, title, ''), '\\s+', ' ', 'g')) = $1
-                      AND lower(regexp_replace(coalesce(author, ''), '\\s+', ' ', 'g')) = $2
-                    LIMIT 1
+                    LIMIT 50
                     """,
                     title,
-                    author,
                 )
-                if exists:
-                    self.known_content_keys.add(key)
-                    return True
+                for row in rows:
+                    row_key = self.content_key(
+                        row["title"],
+                        row["title_en"],
+                        row["author"],
+                        row["isbn"],
+                        row["publisher"],
+                        row["publish_year"],
+                    )
+                    if row_key and row_key == key:
+                        self.known_content_keys.add(key)
+                        return True
         return False
 
     # WORKER 1: EXPLORER (Page -> Book URLs)
@@ -574,12 +701,28 @@ class BookScraper:
                     title_en = info.get("عنوان اصلی", "")
                     author = info.get("نویسنده", "")
                     isbn = info.get("ISBN", "")
+                    publisher = info.get("ناشر", "")
+                    year = info.get("سال نشر", "")
+
+                    # asbook bug: listing search shows ناشر (issue # / month for
+                    # magazines) but the detail table often leaves it blank.
+                    if not (publisher or "").strip():
+                        listing = await self.lookup_listing_meta(
+                            session, url, image_url
+                        )
+                        if listing:
+                            publisher = listing.get("publisher", "") or publisher
+                            year = year or listing.get("year", "")
+                            if not (author or "").strip():
+                                author = listing.get("author", "") or author
 
                     preview = {
                         "title_fa": title,
                         "title_en": title_en,
                         "author": author,
                         "isbn": isbn,
+                        "publisher": publisher,
+                        "year": year,
                     }
                     if await self.is_content_duplicate(preview):
                         self.books_skipped += 1
@@ -603,9 +746,9 @@ class BookScraper:
                         "title_fa": title,
                         "title_en": title_en,
                         "author": author,
-                        "publisher": info.get("ناشر", ""),
+                        "publisher": publisher,
                         "isbn": isbn,
-                        "year": info.get("سال نشر", ""),
+                        "year": year,
                         "language": info.get("زبان", ""),
                         "pages": info.get("تعداد صفحات", ""),
                         "format": info.get("فرمت کتاب", ""),
@@ -622,7 +765,9 @@ class BookScraper:
                     }
 
                     # Reserve key before queueing to reduce concurrent dupes
-                    key = self.content_key(title, title_en, author, isbn)
+                    key = self.content_key(
+                        title, title_en, author, isbn, publisher, year
+                    )
                     if key:
                         self.known_content_keys.add(key)
                     self.known_urls.add(url)
@@ -677,7 +822,12 @@ class BookScraper:
             seen_keys: set[str] = set()
             for d in batch:
                 key = self.content_key(
-                    d.get("title_fa"), d.get("title_en"), d.get("author"), d.get("isbn")
+                    d.get("title_fa"),
+                    d.get("title_en"),
+                    d.get("author"),
+                    d.get("isbn"),
+                    d.get("publisher"),
+                    d.get("year"),
                 )
                 if key and key in seen_keys:
                     self.books_skipped += 1
