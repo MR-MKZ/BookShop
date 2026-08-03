@@ -17,43 +17,29 @@
 {% endblock %}
 
 {% block content %}
-<div class="slider-area">
-    <div class="single-slider slider-height2 slider-bg2 d-flex align-items-center">
-        <div class="container">
-            <div class="row">
-                <div class="col-xl-12">
-                    <div class="hero-caption hero-caption2">
-                        <h2>دسته‌بندی موضوعی</h2>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="categories-listing">
+<section class="categories-page section-padding">
     <div class="container">
-        <div class="row">
-            {% for cat in categories %}
-            <div class="col-6 col-md-4 col-lg-3 mb-3 mb-md-4">
-                <div class="category-item">
-                    <a href="{{ cat.path }}" class="category-img">
-                        <img src="{{ cat.image_url or '/static/img/book/default.png' }}"
-                             alt="{{ cat.name }}"
-                             loading="lazy"
-                             onerror="this.onerror=null;this.src='/static/img/book/default.png'">
-                    </a>
-                    <a class="category-caption" href="{{ cat.path }}">{{ cat.name }}</a>
+        <div class="row justify-content-center">
+            <div class="col-xl-8 col-lg-9">
+                <div class="section-tittle text-center mb-4">
+                    <h2>دسته‌بندی موضوعی</h2>
+                    <p class="text-muted mb-0">یک دسته را انتخاب کنید تا کتاب‌های همان موضوع را ببینید.</p>
                 </div>
-            </div>
-            {% else %}
-            <div class="col-12">
+                {% if categories %}
+                <ul class="category-name-list">
+                    {% for cat in categories %}
+                    <li>
+                        <a href="{{ cat.path }}">{{ cat.name }}</a>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
                 <div class="catalog-empty">
                     <p>هنوز دسته‌بندی‌ای ثبت نشده است.</p>
                 </div>
+                {% endif %}
             </div>
-            {% endfor %}
         </div>
     </div>
-</div>
+</section>
 {% endblock %}

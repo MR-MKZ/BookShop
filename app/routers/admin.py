@@ -31,14 +31,11 @@ from app.auth import get_current_user_optional, get_password_hash
 from app.config import settings
 from app.database import get_async_db
 from app.models import (
-    CATEGORY_FOLDER,
     HERO_CAROUSEL_SECONDS_DEFAULT,
     HERO_CAROUSEL_SECONDS_KEY,
     HERO_FOLDER,
     HERO_MIN_SIZE,
     HERO_RECOMMENDED_SIZE,
-    HOME_CATEGORY_BOOKS_LIMIT_DEFAULT,
-    HOME_CATEGORY_BOOKS_LIMIT_KEY,
     DOWNLOAD_LINK_TTL_HOURS_DEFAULT,
     DOWNLOAD_LINK_TTL_HOURS_KEY,
     PENDING_FILE_CUSTOMER_MESSAGE_DEFAULT,
@@ -2499,42 +2496,7 @@ async def admin_save_pending_file_message(
     )
 
 
-@router.post("/settings/home-category-limit")
-async def admin_save_home_category_limit(
-    limit: str = Form(...),
-    db: AsyncSession = Depends(get_async_db),
-    admin: User = Depends(require_admin),
-):
-    try:
-        value = max(1, min(int(limit), 48))
-    except ValueError:
-        return RedirectResponse(
-            url="/admin/categories?msg=limit_invalid",
-            status_code=status.HTTP_303_SEE_OTHER,
-        )
-    row = (
-        await db.execute(
-            select(AppSetting).where(AppSetting.key == HOME_CATEGORY_BOOKS_LIMIT_KEY)
-        )
-    ).scalar_one_or_none()
-    if row:
-        row.value = str(value)
-    else:
-        db.add(AppSetting(key=HOME_CATEGORY_BOOKS_LIMIT_KEY, value=str(value)))
-    await db.commit()
-    return RedirectResponse(
-        url="/admin/categories?msg=limit_saved",
-        status_code=status.HTTP_303_SEE_OTHER,
-    )
-
-
 # Categories
-
-
-def _category_dir() -> str:
-    path = os.path.join(settings.MEDIA_ROOT, CATEGORY_FOLDER)
-    os.makedirs(path, exist_ok=True)
-    return path
 
 
 async def _unique_category_slug(
@@ -2561,27 +2523,14 @@ async def admin_categories(
     admin: User = Depends(require_admin),
 ):
     cats = await _all_categories(db)
-    limit_row = (
-        await db.execute(
-            select(AppSetting).where(AppSetting.key == HOME_CATEGORY_BOOKS_LIMIT_KEY)
-        )
-    ).scalar_one_or_none()
-    home_limit = HOME_CATEGORY_BOOKS_LIMIT_DEFAULT
-    if limit_row:
-        try:
-            home_limit = int(limit_row.value)
-        except ValueError:
-            pass
     return templates.TemplateResponse(
         "admin/categories.html",
         {
             "request": request,
             "admin": admin,
             "categories": cats,
-            "home_limit": home_limit,
             "message": request.query_params.get("msg"),
             "error": request.query_params.get("error"),
-            "allowed_exts": sorted(ALLOWED_COVER_EXTS),
         },
     )
 
@@ -2591,9 +2540,7 @@ async def admin_category_create(
     name: str = Form(...),
     description: str = Form(""),
     sort_order: int = Form(0),
-    show_on_home: str | None = Form(None),
     is_active: str | None = Form(None),
-    image: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_async_db),
     admin: User = Depends(require_admin),
 ):
@@ -2604,30 +2551,13 @@ async def admin_category_create(
             status_code=status.HTTP_303_SEE_OTHER,
         )
     slug = await _unique_category_slug(db, name)
-    image_filename = None
-    if image and image.filename:
-        ext = _file_ext(image.filename)
-        if ext not in ALLOWED_COVER_EXTS:
-            return RedirectResponse(
-                url="/admin/categories?error=bad_ext",
-                status_code=status.HTTP_303_SEE_OTHER,
-            )
-        data = await image.read()
-        if data:
-            image_filename = (
-                f"cat_{uuid.uuid4().hex[:12]}.{ext if ext != 'jpeg' else 'jpg'}"
-            )
-            with open(os.path.join(_category_dir(), image_filename), "wb") as f:
-                f.write(data)
-
     db.add(
         Category(
             name=name,
             slug=slug,
             description=description.strip() or None,
-            image_filename=image_filename,
             sort_order=sort_order,
-            show_on_home=show_on_home is not None,
+            show_on_home=False,
             is_active=is_active is not None,
         )
     )
@@ -2644,9 +2574,7 @@ async def admin_category_edit(
     name: str = Form(...),
     description: str = Form(""),
     sort_order: int = Form(0),
-    show_on_home: str | None = Form(None),
     is_active: str | None = Form(None),
-    image: UploadFile | None = File(None),
     db: AsyncSession = Depends(get_async_db),
     admin: User = Depends(require_admin),
 ):
@@ -2666,31 +2594,8 @@ async def admin_category_edit(
     cat.slug = await _unique_category_slug(db, name, exclude_id=cat.id)
     cat.description = description.strip() or None
     cat.sort_order = sort_order
-    cat.show_on_home = show_on_home is not None
+    cat.show_on_home = False
     cat.is_active = is_active is not None
-
-    if image and image.filename:
-        ext = _file_ext(image.filename)
-        if ext not in ALLOWED_COVER_EXTS:
-            return RedirectResponse(
-                url="/admin/categories?error=bad_ext",
-                status_code=status.HTTP_303_SEE_OTHER,
-            )
-        data = await image.read()
-        if data:
-            if cat.image_filename:
-                old = os.path.join(_category_dir(), cat.image_filename)
-                if os.path.isfile(old):
-                    try:
-                        os.remove(old)
-                    except OSError:
-                        pass
-            filename = (
-                f"cat_{uuid.uuid4().hex[:12]}.{ext if ext != 'jpeg' else 'jpg'}"
-            )
-            with open(os.path.join(_category_dir(), filename), "wb") as f:
-                f.write(data)
-            cat.image_filename = filename
 
     await db.commit()
     return RedirectResponse(
@@ -2714,13 +2619,6 @@ async def admin_category_delete(
     ).scalar_one_or_none()
     if not cat:
         raise HTTPException(status_code=404)
-    if cat.image_filename:
-        path = os.path.join(_category_dir(), cat.image_filename)
-        if os.path.isfile(path):
-            try:
-                os.remove(path)
-            except OSError:
-                pass
     cat.books = []
     await db.delete(cat)
     await db.commit()

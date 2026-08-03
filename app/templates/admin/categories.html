@@ -5,46 +5,25 @@
 {% if message == 'created' %}<div class="msg">دسته ایجاد شد.</div>
 {% elif message == 'saved' %}<div class="msg">ذخیره شد.</div>
 {% elif message == 'deleted' %}<div class="msg">حذف شد.</div>
-{% elif message == 'limit_saved' %}<div class="msg">تعداد ویترین صفحه اصلی ذخیره شد.</div>
-{% elif message == 'limit_invalid' %}<div class="msg" style="background:#fecaca;color:#991b1b;">مقدار نامعتبر است.</div>
 {% elif message %}<div class="msg">{{ message }}</div>{% endif %}
 {% if error == 'empty_name' %}<div class="msg" style="background:#fecaca;color:#991b1b;">نام دسته الزامی است.</div>
-{% elif error == 'bad_ext' %}<div class="msg" style="background:#fecaca;color:#991b1b;">فرمت تصویر مجاز نیست.</div>
 {% elif error %}<div class="msg" style="background:#fecaca;color:#991b1b;">{{ error }}</div>{% endif %}
-
-<div class="card" style="margin-bottom:24px;max-width:480px;">
-    <h2 style="font-size:1.1rem;">تعداد کتاب در ویترین هر دسته (صفحه اصلی)</h2>
-    <form method="post" action="/admin/settings/home-category-limit" class="filters" style="margin:0;">
-        <label>
-            تعداد
-            <input type="number" name="limit" min="1" max="48" value="{{ home_limit }}" required style="width:100px;max-width:100%;">
-        </label>
-        <button class="btn" type="submit">ذخیره</button>
-    </form>
-</div>
 
 <div class="card" style="margin-bottom:24px;max-width:640px;">
     <h2 style="font-size:1.1rem;">دسته جدید</h2>
-    <form method="post" action="/admin/categories/new" enctype="multipart/form-data" class="admin-form">
+    <form method="post" action="/admin/categories/new" class="admin-form">
         <div class="form-grid">
             <div class="form-field full">
                 <label for="name">نام</label>
                 <input id="name" name="name" required>
             </div>
             <div class="form-field full">
-                <label for="description">توضیح</label>
+                <label for="description">توضیح (اختیاری)</label>
                 <textarea id="description" name="description" rows="2"></textarea>
             </div>
             <div class="form-field">
                 <label for="sort_order">ترتیب</label>
                 <input id="sort_order" name="sort_order" type="number" value="0">
-            </div>
-            <div class="form-field">
-                <label for="image">تصویر</label>
-                <input id="image" name="image" type="file" accept=".{{ allowed_exts|join(',.') }}">
-            </div>
-            <div class="form-field">
-                <label class="form-check"><input type="checkbox" name="show_on_home"> نمایش در صفحه اصلی</label>
             </div>
             <div class="form-field">
                 <label class="form-check"><input type="checkbox" name="is_active" checked> فعال</label>
@@ -59,26 +38,18 @@
 <table>
     <thead>
         <tr>
-            <th>تصویر</th>
             <th>نام</th>
             <th>اسلاگ</th>
             <th>ترتیب</th>
-            <th>هوم</th>
             <th>فعال</th>
-            <th>ویرایش</th>
+            <th>عملیات</th>
         </tr>
     </thead>
     <tbody>
         {% for cat in categories %}
         <tr>
-            <td>
-                {% if cat.image_url %}
-                <img src="{{ cat.image_url }}" alt="" width="48" height="48" style="object-fit:cover;border-radius:6px;">
-                {% else %}—{% endif %}
-            </td>
-            <td colspan="6">
-                <form method="post" action="/admin/categories/{{ cat.id }}/edit" enctype="multipart/form-data"
-                      class="admin-form" style="margin:0;">
+            <td colspan="5">
+                <form method="post" action="/admin/categories/{{ cat.id }}/edit" class="admin-form" style="margin:0;">
                     <div class="form-grid category-edit-grid">
                         <div class="form-field">
                             <label>نام</label>
@@ -91,16 +62,6 @@
                         <div class="form-field">
                             <label>ترتیب</label>
                             <input name="sort_order" type="number" value="{{ cat.sort_order }}">
-                        </div>
-                        <div class="form-field">
-                            <label>تصویر جدید</label>
-                            <input name="image" type="file" accept=".{{ allowed_exts|join(',.') }}">
-                        </div>
-                        <div class="form-field">
-                            <label class="form-check">
-                                <input type="checkbox" name="show_on_home" {% if cat.show_on_home %}checked{% endif %}>
-                                صفحه اصلی
-                            </label>
                         </div>
                         <div class="form-field">
                             <label class="form-check">
@@ -124,7 +85,7 @@
             </td>
         </tr>
         {% else %}
-        <tr><td colspan="7">دسته‌ای ثبت نشده</td></tr>
+        <tr><td colspan="5">دسته‌ای ثبت نشده</td></tr>
         {% endfor %}
     </tbody>
 </table>

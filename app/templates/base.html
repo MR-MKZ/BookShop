@@ -1813,69 +1813,39 @@
         .password-toggle:hover { color: #00a4a6; }
         input.auto-dir { unicode-bidi: plaintext; }
 
-        /* —— Categories (home carousel + listing) —— */
-        .categories-slider .section-tittle-row {
-            padding: 0 20px;
-            margin-bottom: 28px !important;
-        }
-        .categories-slider .section-tittle-row h2 {
-            font-size: 1.35rem !important;
-            margin-bottom: 0 !important;
-        }
-        .home-category-shelf {
-            padding-top: 50px;
-            padding-bottom: 30px;
-        }
+        /* —— Categories (nav + simple listing page) —— */
         .home-latest-shelf {
             padding-top: 70px;
             padding-bottom: 70px;
         }
-        .categories-listing {
+        .categories-page {
             padding-top: 40px;
-            padding-bottom: 50px;
+            padding-bottom: 60px;
         }
-        .categories-listing .category-item {
-            display: flex !important;
-            flex-direction: column;
-            align-items: center;
-            text-align: center;
-            height: 100%;
-            padding: 14px 10px;
-            border: 1px solid #ecffff;
-            border-radius: 15px;
-            transition: background .25s ease, box-shadow .25s ease;
+        .category-name-list {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 12px;
+            justify-content: center;
+        }
+        .category-name-list a {
+            display: inline-block;
+            padding: 10px 18px;
+            border: 1px solid #d9eef0;
+            border-radius: 999px;
             background: #fff;
+            color: #1e293b;
+            text-decoration: none;
+            font-size: .95rem;
+            transition: background .2s ease, border-color .2s ease, color .2s ease;
         }
-        .categories-listing .category-item:hover {
+        .category-name-list a:hover {
             background: #ecffff;
-            box-shadow: 0 6px 18px rgba(0, 164, 166, 0.12);
-        }
-        .categories-listing .category-img {
-            display: block;
-            width: 100%;
-            max-width: 160px;
-        }
-        .categories-listing .category-img img {
-            width: 100%;
-            height: auto;
-            aspect-ratio: 1;
-            object-fit: cover;
-            border-radius: 15px;
-            margin: 0 auto;
-        }
-        .categories-listing .category-caption {
-            margin-top: 12px;
-            margin-bottom: 0;
-            font-size: 0.95rem;
-            line-height: 1.35;
-            overflow-wrap: anywhere;
-        }
-        .category-page .hero-caption2 p {
-            max-width: 40rem;
-            margin-left: auto;
-            margin-right: auto;
-            line-height: 1.6;
-            overflow-wrap: anywhere;
+            border-color: #00a4a6;
+            color: #00a4a6;
         }
 
         /* Order thanks / pending-file blocks */
@@ -1892,55 +1862,18 @@
             margin-top: 1.5rem;
         }
 
-        @media (max-width: 1199.98px) {
-            .categories-slider {
-                margin: 48px 24px 24px !important;
-            }
-        }
-        @media (max-width: 991.98px) {
-            .categories-active .slick-next,
-            .categories-active .slick-prev {
-                bottom: auto;
-                top: -4px;
-            }
-            .categories-slider .section-tittle-row {
-                padding: 0 12px;
-            }
-        }
         @media (max-width: 767.98px) {
-            .categories-slider {
-                margin: 28px 12px 16px !important;
-                padding: 16px 0 8px !important;
-            }
-            .categories-slider .section-tittle-row {
-                flex-wrap: wrap;
-                gap: 8px 12px;
-                margin-bottom: 16px !important;
-                padding: 0 10px;
-            }
-            .categories-slider .section-tittle-row h2 {
-                font-size: 1.15rem !important;
-            }
-            .categories-slider .section-see-all {
-                font-size: 13px;
-            }
-            .category-img img {
-                width: min(120px, 42vw);
-                max-width: 100%;
-                height: auto;
-            }
-            .home-category-shelf,
             .home-latest-shelf {
                 padding-top: 36px !important;
                 padding-bottom: 28px !important;
             }
-            .categories-listing {
+            .categories-page {
                 padding-top: 24px;
                 padding-bottom: 36px;
             }
-            .category-page .slider-area .hero-caption2 p {
-                font-size: 0.88rem !important;
-                padding: 0 8px;
+            .category-name-list a {
+                font-size: .88rem;
+                padding: 8px 14px;
             }
             .order-thanks-page.cart_area.section-padding {
                 padding-top: 28px;
@@ -1960,10 +1893,6 @@
                 width: 100%;
                 display: inline-flex;
                 justify-content: center;
-            }
-            .category-page .best-selling.section-padding {
-                padding-top: 24px !important;
-                padding-bottom: 32px !important;
             }
         }
         @media (max-width: 575.98px) {
@@ -2005,21 +1934,6 @@
                 width: 100%;
                 text-align: center;
                 box-sizing: border-box;
-            }
-            .categories-listing .row > [class*="col-"] {
-                margin-bottom: 12px;
-            }
-            .categories-listing .category-item {
-                padding: 10px 8px;
-            }
-            .categories-listing .category-caption {
-                font-size: 0.85rem;
-            }
-            .categories-slider {
-                margin: 20px 8px 12px !important;
-            }
-            .category-img img {
-                width: min(110px, 48vw);
             }
             .slicknav_nav .slicknav_row,
             .slicknav_nav a {
@@ -2112,12 +2026,15 @@
                                             <li><a href="/search">کتاب‌ها</a></li>
                                             {% set nav_cats = request.state.nav_categories|default([]) %}
                                             {% if nav_cats %}
+                                            {% set nav_cat_limit = 8 %}
                                             <li><a href="/categories">دسته‌بندی</a>
                                                 <ul class="submenu">
-                                                    {% for cat in nav_cats %}
+                                                    {% for cat in nav_cats[:nav_cat_limit] %}
                                                     <li><a href="{{ cat.path }}">{{ cat.name }}</a></li>
                                                     {% endfor %}
-                                                    <li><a href="/categories">همه دسته‌ها</a></li>
+                                                    {% if nav_cats|length > nav_cat_limit %}
+                                                    <li><a href="/categories"><strong>همه دسته‌بندی‌ها</strong></a></li>
+                                                    {% endif %}
                                                 </ul>
                                             </li>
                                             {% endif %}

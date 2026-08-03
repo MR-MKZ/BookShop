@@ -16,8 +16,6 @@ from app.database import get_async_db
 from app.models import (
     HERO_CAROUSEL_SECONDS_DEFAULT,
     HERO_CAROUSEL_SECONDS_KEY,
-    HOME_CATEGORY_BOOKS_LIMIT_DEFAULT,
-    HOME_CATEGORY_BOOKS_LIMIT_KEY,
     AppSetting,
     Book,
     Category,
@@ -100,53 +98,6 @@ async def home(
         seconds = HERO_CAROUSEL_SECONDS_DEFAULT
     seconds = max(3, min(seconds, 120))
 
-    limit_row = (
-        await db.execute(
-            select(AppSetting).where(AppSetting.key == HOME_CATEGORY_BOOKS_LIMIT_KEY)
-        )
-    ).scalar_one_or_none()
-    try:
-        cat_limit = (
-            int(limit_row.value) if limit_row else HOME_CATEGORY_BOOKS_LIMIT_DEFAULT
-        )
-    except (TypeError, ValueError):
-        cat_limit = HOME_CATEGORY_BOOKS_LIMIT_DEFAULT
-    cat_limit = max(1, min(cat_limit, 48))
-
-    home_cats = list(
-        (
-            await db.execute(
-                select(Category)
-                .where(
-                    and_(
-                        Category.is_active == True,  # noqa: E712
-                        Category.show_on_home == True,  # noqa: E712
-                    )
-                )
-                .order_by(Category.sort_order.asc(), Category.name.asc())
-            )
-        )
-        .scalars()
-        .all()
-    )
-    home_category_sections = []
-    for cat in home_cats:
-        books_result = await db.execute(
-            select(Book)
-            .join(book_categories, book_categories.c.book_id == Book.id)
-            .where(
-                and_(
-                    book_categories.c.category_id == cat.id,
-                    Book.is_active == True,  # noqa: E712
-                )
-            )
-            .order_by(desc(Book.created_at))
-            .limit(cat_limit)
-        )
-        cat_books = list(books_result.scalars().all())
-        if cat_books:
-            home_category_sections.append({"category": cat, "books": cat_books})
-
     return templates.TemplateResponse(
         "index.html",
         {
@@ -154,8 +105,6 @@ async def home(
             "books": new_books,
             "hero_slides": hero_slides,
             "hero_interval_ms": seconds * 1000,
-            "home_categories": home_cats,
-            "home_category_sections": home_category_sections,
             "query": "",
             "current_user": current_user,
         },

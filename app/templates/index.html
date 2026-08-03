@@ -77,66 +77,6 @@
     </div>
 </div>
 
-{% if home_categories %}
-<div class="categories-slider home-categories-band">
-    <div class="container">
-        <div class="row justify-content-right">
-            <div class="col-12">
-                <div class="section-tittle section-tittle-row">
-                    <h2>دسته‌بندی‌ها</h2>
-                    <a href="/categories" class="section-see-all">
-                        همه دسته‌ها
-                        <i class="fas fa-arrow-left" aria-hidden="true"></i>
-                    </a>
-                </div>
-            </div>
-        </div>
-        <div class="row">
-            <div class="col-xl-12">
-                <div class="categories-active">
-                    {% for cat in home_categories %}
-                    <div class="category-item">
-                        <a href="{{ cat.path }}" class="category-img">
-                            <img src="{{ cat.image_url or '/static/img/book/default.png' }}"
-                                 alt="{{ cat.name }}"
-                                 loading="lazy"
-                                 onerror="this.onerror=null;this.src='/static/img/book/default.png'">
-                        </a>
-                        <a class="category-caption" href="{{ cat.path }}">{{ cat.name }}</a>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-{% for section in home_category_sections|default([]) %}
-<div class="best-selling section-bg home-category-shelf">
-    <div class="container">
-        <div class="row">
-            <div class="col-12">
-                <div class="section-tittle section-tittle-row">
-                    <h2>{{ section.category.name }}</h2>
-                    <a href="{{ section.category.path }}" class="section-see-all">
-                        مشاهده همه
-                        <i class="fas fa-arrow-left" aria-hidden="true"></i>
-                    </a>
-                </div>
-            </div>
-        </div>
-        <div class="row">
-            {% for book in section.books %}
-            <div class="col-xxl-3 col-xl-3 col-lg-4 col-md-6 col-sm-6">
-                {{ book_card(book) }}
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-</div>
-{% endfor %}
-
 <div class="best-selling section-bg home-latest-shelf">
     <div class="container">
         <div class="row">

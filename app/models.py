@@ -600,7 +600,6 @@ PENDING_FILE_CUSTOMER_MESSAGE_DEFAULT = (
     "و شماره سفارش {order_id} و شماره تماس {phone} را ارسال کنید تا فایل برایتان آماده شود."
 )
 
-HOME_CATEGORY_BOOKS_LIMIT_KEY = "home_category_books_limit"
-HOME_CATEGORY_BOOKS_LIMIT_DEFAULT = 8
-
 CATEGORY_FOLDER = "categories"
+# Max category links in the top nav dropdown before "all categories"
+NAV_CATEGORY_LIMIT = 8
