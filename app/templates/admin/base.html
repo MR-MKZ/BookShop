@@ -486,7 +486,9 @@
             <a href="/admin/books?missing_pdf=1">بدون فایل</a>
             <a href="/admin/users" class="{% if '/admin/users' in request.url.path %}active{% endif %}">کاربران</a>
             <a href="/admin/orders" class="{% if '/admin/orders' in request.url.path %}active{% endif %}">سفارش‌ها</a>
+            <a href="/admin/categories" class="{% if '/admin/categories' in request.url.path %}active{% endif %}">دسته‌بندی‌ها</a>
             <a href="/admin/coupons" class="{% if '/admin/coupons' in request.url.path or '/admin/settings' in request.url.path %}active{% endif %}">تخفیف و دانلود</a>
+            <a href="/admin/download-links" class="{% if '/admin/download-links' in request.url.path %}active{% endif %}">لینک‌های دانلود</a>
             <a href="/admin/hero" class="{% if '/admin/hero' in request.url.path %}active{% endif %}">کاور صفحه اصلی</a>
             <a href="/admin/reports" class="{% if '/admin/reports' in request.url.path %}active{% endif %}">گزارش‌ها</a>
             <a href="/admin/scraper" class="{% if '/admin/scraper' in request.url.path %}active{% endif %}">اسکرپر</a>

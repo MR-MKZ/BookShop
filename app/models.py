@@ -12,6 +12,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    Table,
     Text,
     Index,
 )
@@ -20,6 +21,24 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 from app.database import Base
+
+
+book_categories = Table(
+    "book_categories",
+    Base.metadata,
+    Column(
+        "book_id",
+        Integer,
+        ForeignKey("books.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "category_id",
+        Integer,
+        ForeignKey("categories.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+)
 
 
 class UserRole(str, enum.Enum):
@@ -70,6 +89,8 @@ class Book(Base):
     amazon_link = Column(String)
     image_url = Column(String)
     has_pdf = Column(Boolean, default=False, server_default="false", index=True)
+    # Direct host URL (never exposed to clients; streamed via media proxy)
+    external_file_url = Column(Text, nullable=True)
 
     # Status
     is_active = Column(Boolean, default=True, server_default="true")
@@ -80,6 +101,11 @@ class Book(Base):
 
     # Relationships
     order_items = relationship("OrderItem", back_populates="book")
+    categories = relationship(
+        "Category",
+        secondary=book_categories,
+        back_populates="books",
+    )
 
     __table_args__ = (
         Index(
@@ -246,6 +272,65 @@ class Book(Base):
             self.id, self.title_en, self.title, self.file_format
         )
 
+    @property
+    def has_file_ready(self) -> bool:
+        """True when a local upload or external download URL is configured."""
+        if self.external_file_url and str(self.external_file_url).strip():
+            return True
+        if self.file_filename:
+            return True
+        return bool(self.has_pdf)
+
+    def sync_has_pdf(self) -> None:
+        """Keep has_pdf aligned with local file or external URL presence."""
+        self.has_pdf = bool(
+            (self.external_file_url and str(self.external_file_url).strip())
+            or self.file_filename
+        )
+
+
+class Category(Base):
+    __tablename__ = "categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False, index=True)
+    slug = Column(String, unique=True, nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    image_filename = Column(String, nullable=True)
+    sort_order = Column(Integer, default=0, server_default="0", nullable=False)
+    show_on_home = Column(Boolean, default=False, server_default="false", nullable=False)
+    is_active = Column(Boolean, default=True, server_default="true", nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    books = relationship(
+        "Book",
+        secondary=book_categories,
+        back_populates="categories",
+    )
+
+    @staticmethod
+    def slugify(name: str | None, max_len: int = 80) -> str:
+        text = (name or "").strip()
+        text = re.sub(r"[^\w\s\-]+", "", text, flags=re.UNICODE)
+        text = re.sub(r"[\s\-]+", "-", text).strip("-_")
+        ascii_text = text.encode("ascii", "ignore").decode("ascii").strip("-_")
+        if ascii_text:
+            return ascii_text[:max_len].strip("-_") or "category"
+        # Persian / non-ASCII: hash-based fallback for URL safety
+        digest = hashlib.md5((name or "category").encode()).hexdigest()[:10]
+        return f"cat-{digest}"
+
+    @property
+    def path(self) -> str:
+        return f"/category/{self.slug}"
+
+    @property
+    def image_url(self) -> str | None:
+        if not self.image_filename:
+            return None
+        return f"/media/proxy/category/{self.image_filename}"
+
 
 class User(Base):
     __tablename__ = "users"
@@ -347,13 +432,24 @@ class OrderItem(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     order_id = Column(Integer, ForeignKey("orders.id"))
-    book_id = Column(Integer, ForeignKey("books.id"))
+    book_id = Column(
+        Integer,
+        ForeignKey("books.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    book_title = Column(String, nullable=True)
     price = Column(Numeric(10, 2))
     quantity = Column(Integer, default=1)
 
     # Relationships
     order = relationship("Order", back_populates="items")
     book = relationship("Book", back_populates="order_items")
+
+    @property
+    def display_title(self) -> str:
+        if self.book is not None:
+            return self.book.display_title
+        return (self.book_title or "کتاب حذف‌شده").strip() or "کتاب حذف‌شده"
 
 
 class CouponRedemption(Base):
@@ -374,10 +470,17 @@ class DownloadLink(Base):
     id = Column(Integer, primary_key=True, index=True)
     token = Column(String, unique=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    order_id = Column(Integer, ForeignKey("orders.id"))
-    book_id = Column(Integer, ForeignKey("books.id"))
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=True)
+    book_id = Column(
+        Integer,
+        ForeignKey("books.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     is_used = Column(Boolean, default=False)
+    download_count = Column(Integer, default=0, server_default="0", nullable=False)
     expires_at = Column(DateTime(timezone=True))
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    note = Column(String, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     used_at = Column(DateTime(timezone=True), nullable=True)
 
@@ -393,7 +496,11 @@ class Cart(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     session_id = Column(String, index=True, nullable=True)
-    book_id = Column(Integer, ForeignKey("books.id"))
+    book_id = Column(
+        Integer,
+        ForeignKey("books.id", ondelete="CASCADE"),
+        nullable=False,
+    )
     quantity = Column(Integer, default=1)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -466,3 +573,14 @@ HERO_MIN_SIZE = "1338 × 600"
 
 DOWNLOAD_LINK_TTL_HOURS_KEY = "download_link_ttl_hours"
 DOWNLOAD_LINK_TTL_HOURS_DEFAULT = 6
+
+PENDING_FILE_CUSTOMER_MESSAGE_KEY = "pending_file_customer_message"
+PENDING_FILE_CUSTOMER_MESSAGE_DEFAULT = (
+    "فایل کتاب «{book_title}» هنوز آماده نیست. لطفاً در پیامرسان با پشتیبانی تماس بگیرید "
+    "و شماره سفارش {order_id} و شماره تماس {phone} را ارسال کنید تا فایل برایتان آماده شود."
+)
+
+HOME_CATEGORY_BOOKS_LIMIT_KEY = "home_category_books_limit"
+HOME_CATEGORY_BOOKS_LIMIT_DEFAULT = 8
+
+CATEGORY_FOLDER = "categories"

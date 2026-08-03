@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% from "macros.html" import book_card, page_pagination %}
+
+{% block title %}{{ category.name }} — خرید و دانلود کتاب | لامابوک{% endblock %}
+{% block meta_description %}کتاب‌های دسته {{ category.name }} در لامابوک — خرید و دانلود نسخه کامل.{% endblock %}
+{% block canonical_url %}{{ site_origin }}{{ category.path }}{% endblock %}
+
+{% block breadcrumb %}
+<div class="breadcrumb-items">
+    <div class="row">
+        <ul class="breadcrumb">
+            <li><a href="/" class="breadcrumb-link">صفحه اصلی</a></li>
+            <li class="chevron"><span class="fa fa-chevron-left"></span></li>
+            <li><a href="/categories" class="breadcrumb-link">دسته‌بندی‌ها</a></li>
+            <li class="chevron"><span class="fa fa-chevron-left"></span></li>
+            <li><span class="breadcrumb-active">{{ category.name }}</span></li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="slider-area">
+    <div class="single-slider slider-height2 slider-bg2 d-flex align-items-center">
+        <div class="container">
+            <div class="row">
+                <div class="col-xl-12">
+                    <div class="hero-caption hero-caption2">
+                        <h2>{{ category.name }}</h2>
+                        {% if category.description %}
+                        <p>{{ category.description }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<section class="best-selling p-0 section-padding">
+    <div class="container">
+        <div class="row">
+            {% for book in books %}
+            <div class="col-xxl-3 col-xl-3 col-lg-4 col-md-6 col-sm-6">
+                {{ book_card(book) }}
+            </div>
+            {% else %}
+            <div class="col-12">
+                <div class="catalog-empty">
+                    <p>کتابی در این دسته یافت نشد.</p>
+                    <a href="/search" class="btn">مشاهده همه کتاب‌ها</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% if total_pages and total_pages > 1 %}
+        <div class="row mt-4">
+            <div class="col-12">
+                {{ page_pagination(page, total_pages, '/category/' ~ category.slug, '') }}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

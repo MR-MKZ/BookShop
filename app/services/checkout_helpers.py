@@ -13,6 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import (
     DOWNLOAD_LINK_TTL_HOURS_DEFAULT,
     DOWNLOAD_LINK_TTL_HOURS_KEY,
+    PENDING_FILE_CUSTOMER_MESSAGE_DEFAULT,
+    PENDING_FILE_CUSTOMER_MESSAGE_KEY,
     AppSetting,
     Coupon,
     DiscountType,
@@ -54,6 +56,35 @@ async def get_download_ttl_hours(db: AsyncSession) -> int:
 
 async def get_download_ttl_seconds(db: AsyncSession) -> int:
     return (await get_download_ttl_hours(db)) * 3600
+
+
+async def get_pending_file_message_template(db: AsyncSession) -> str:
+    result = await db.execute(
+        select(AppSetting).where(AppSetting.key == PENDING_FILE_CUSTOMER_MESSAGE_KEY)
+    )
+    row = result.scalar_one_or_none()
+    if not row or not str(row.value or "").strip():
+        return PENDING_FILE_CUSTOMER_MESSAGE_DEFAULT
+    return str(row.value)
+
+
+def format_pending_file_message(
+    template: str,
+    *,
+    order_id: int | str,
+    book_title: str,
+    phone: str = "",
+    email: str = "",
+) -> str:
+    try:
+        return template.format(
+            order_id=order_id,
+            book_title=book_title or "کتاب",
+            phone=phone or "—",
+            email=email or "—",
+        )
+    except (KeyError, ValueError):
+        return template
 
 
 def compute_discount(coupon: Coupon, subtotal: Decimal) -> Decimal:

@@ -24,25 +24,40 @@
         <div class="alert alert-success">
             پرداخت با موفقیت انجام شد. سفارش شماره <strong>{{ order.id }}</strong> ثبت شد.
         </div>
+
+        {% if downloads %}
         <h3 class="mb-3">لینک‌های دانلود</h3>
         <p class="text-muted">هر لینک حدود {{ ttl_hours }} ساعت اعتبار دارد. می‌توانید بعداً از
             <a class="text-link" href="/orders/recover">بازیابی سفارش</a>
             {% if current_user %}یا <a class="text-link" href="/profile">کتابخانه من</a>{% endif %}
             دوباره دریافت کنید.
         </p>
-        {% if downloads %}
         <ul class="list-unstyled">
             {% for item in downloads %}
             <li class="mb-3 p-3 border rounded">
-                <strong>{{ item.book.title }}</strong>
+                <strong>{{ item.title or item.book.display_title }}</strong>
                 <div class="mt-2">
                     <a class="btn" href="{{ item.url }}">دانلود فایل</a>
                 </div>
             </li>
             {% endfor %}
         </ul>
-        {% else %}
-        <p>فایل هنوز آماده نیست. با پشتیبانی تماس بگیرید.</p>
+        {% endif %}
+
+        {% if pending_files %}
+        <h3 class="mb-3 mt-4">آماده‌سازی فایل</h3>
+        <ul class="list-unstyled">
+            {% for item in pending_files %}
+            <li class="mb-3 p-3 border rounded">
+                <strong>{{ item.title }}</strong>
+                <p class="mt-2 mb-0" style="white-space:pre-wrap;">{{ item.message }}</p>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        {% if not downloads and not pending_files %}
+        <p>جزئیات سفارش ثبت شد.</p>
         {% endif %}
 
         {% elif pending %}

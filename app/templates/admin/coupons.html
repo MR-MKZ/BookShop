@@ -5,6 +5,8 @@
 <h1>کدهای تخفیف</h1>
 {% if message == 'ttl_saved' %}
 <div class="msg">مدت اعتبار لینک دانلود ذخیره شد.</div>
+{% elif message == 'pending_msg_saved' %}
+<div class="msg">پیام آماده‌سازی فایل ذخیره شد.</div>
 {% elif message == 'deleted' %}
 <div class="msg">کد تخفیف حذف شد.</div>
 {% elif message == 'deactivated' %}
@@ -25,6 +27,22 @@
         <button class="btn" type="submit">ذخیره</button>
     </form>
     <p style="color:#64748b;font-size:.85rem;margin:8px 0 0;">پیش‌فرض ۶ ساعت. پس از انقضا کاربر می‌تواند از بازیابی سفارش لینک جدید بگیرد.</p>
+</div>
+
+<div class="card" style="margin-bottom:24px;max-width:640px;">
+    <h2 style="font-size:1.1rem;">پیام وقتی فایل هنوز آماده نیست</h2>
+    <form method="post" action="/admin/settings/pending-file-message" class="admin-form">
+        <div class="form-field full">
+            <textarea name="message" rows="5" required>{{ pending_message }}</textarea>
+            <p class="form-hint" style="color:#64748b;font-size:.85rem;margin:8px 0 0;">
+                جایگذاری‌ها: <code dir="ltr">{order_id}</code>،
+                <code dir="ltr">{book_title}</code>،
+                <code dir="ltr">{phone}</code>،
+                <code dir="ltr">{email}</code>
+            </p>
+        </div>
+        <button class="btn" type="submit" style="margin-top:8px;">ذخیره پیام</button>
+    </form>
 </div>
 
 <div class="btn-row" style="margin-bottom:16px;">

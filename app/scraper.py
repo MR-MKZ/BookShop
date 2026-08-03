@@ -8,7 +8,7 @@ import re
 import signal
 import socket
 import sys
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit, urlunsplit
 
 import aioftp
 import aiohttp
@@ -42,6 +42,44 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def resolve_proxy_url(cli_proxy: str | None = None) -> str | None:
+    """CLI --proxy wins, then SCRAPER_PROXY / standard HTTP(S)_PROXY env vars."""
+    for candidate in (
+        cli_proxy,
+        os.getenv("SCRAPER_PROXY"),
+        os.getenv("SCRAPER_HTTP_PROXY"),
+        os.getenv("HTTPS_PROXY"),
+        os.getenv("HTTP_PROXY"),
+        os.getenv("ALL_PROXY"),
+        os.getenv("https_proxy"),
+        os.getenv("http_proxy"),
+        os.getenv("all_proxy"),
+    ):
+        if candidate and str(candidate).strip():
+            return str(candidate).strip()
+    return None
+
+
+def redact_proxy_url(proxy: str) -> str:
+    """Hide password in logs."""
+    parts = urlsplit(proxy)
+    if not parts.hostname:
+        return proxy
+    auth = ""
+    if parts.username or parts.password:
+        user = parts.username or ""
+        auth = f"{user}:***@"
+    host = parts.hostname
+    port = f":{parts.port}" if parts.port else ""
+    return urlunsplit(
+        (parts.scheme, f"{auth}{host}{port}", parts.path, parts.query, parts.fragment)
+    )
+
+
+def is_socks_proxy(proxy: str) -> bool:
+    return proxy.lower().startswith(("socks4://", "socks5://", "socks5h://"))
+
+
 class BookScraper:
     def __init__(self, args):
         self.args = args
@@ -58,9 +96,28 @@ class BookScraper:
         self.stop_discovery = asyncio.Event()  # Signal when all pages are scanned
 
         self.headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+            "Accept": (
+                "text/html,application/xhtml+xml,application/xml;q=0.9,"
+                "image/avif,image/webp,image/apng,*/*;q=0.8"
+            ),
+            "Accept-Language": "en-US,en;q=0.9,fa;q=0.8",
+            "Cache-Control": "no-cache",
+            "Pragma": "no-cache",
+            "Upgrade-Insecure-Requests": "1",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
         }
+
+        self.proxy_url = resolve_proxy_url(getattr(args, "proxy", None))
+        # HTTP(S) proxy passed per-request; SOCKS is baked into the connector
+        self._request_proxy: str | None = None
 
         self.known_urls: set[str] = set()
         self.known_content_keys: set[str] = set()
@@ -72,6 +129,36 @@ class BookScraper:
         self.pages_done = 0
         self.books_saved = 0
         self.books_skipped = 0
+
+    def _build_connector(self) -> aiohttp.BaseConnector:
+        proxy = self.proxy_url
+        if proxy and is_socks_proxy(proxy):
+            try:
+                from aiohttp_socks import ProxyConnector
+            except ImportError as exc:
+                raise RuntimeError(
+                    "SOCKS proxy needs aiohttp-socks — "
+                    "pip install aiohttp-socks / rebuild scraper image"
+                ) from exc
+            self._request_proxy = None
+            logger.info("Scraper proxy (SOCKS): %s", redact_proxy_url(proxy))
+            return ProxyConnector.from_url(proxy, limit=0)
+
+        self._request_proxy = proxy
+        if proxy:
+            logger.info("Scraper proxy (HTTP): %s", redact_proxy_url(proxy))
+        else:
+            logger.info("Scraper proxy: none (direct)")
+        return aiohttp.TCPConnector(limit=0)
+
+    def _get_kwargs(self) -> dict:
+        kw: dict = {
+            "headers": self.headers,
+            "timeout": aiohttp.ClientTimeout(total=self.args.timeout),
+        }
+        if self._request_proxy:
+            kw["proxy"] = self._request_proxy
+        return kw
 
     async def init_db(self):
         """Initialize Postgres Connection Pool."""
@@ -153,6 +240,8 @@ class BookScraper:
             parts.append("turbo")
         if getattr(self.args, "content_dedup", False):
             parts.append("content-dedup")
+        if self.proxy_url:
+            parts.append("proxy")
         start = self.args.start_page
         end = self.args.end_page or (self.args.start_page + pages_total - 1)
         parts.append(f"pages={start}-{end}")
@@ -234,7 +323,7 @@ class BookScraper:
     async def get_total_pages(self, session: aiohttp.ClientSession) -> int:
         """Auto-detects the last page number from explore paging links."""
         logger.info("Detecting total pages...")
-        url = f"{self.base_url}/explore/page/1"
+        url = f"{self.base_url}/explore/page/1/"
         html = None
         for attempt in range(max(1, self.args.retries)):
             html = await self.fetch(session, url)
@@ -286,9 +375,7 @@ class BookScraper:
         async with self.semaphore:
             for attempt in range(self.args.retries):
                 try:
-                    async with session.get(
-                        url, headers=self.headers, timeout=self.args.timeout
-                    ) as response:
+                    async with session.get(url, **self._get_kwargs()) as response:
                         if response.status == 200:
                             return await response.text()
                         elif response.status == 404:
@@ -322,9 +409,7 @@ class BookScraper:
         async with self.semaphore:
             for attempt in range(self.args.retries):
                 try:
-                    async with session.get(
-                        url, headers=self.headers, timeout=self.args.timeout
-                    ) as response:
+                    async with session.get(url, **self._get_kwargs()) as response:
                         if response.status == 200:
                             return await response.read()
                         elif response.status == 404:
@@ -643,7 +728,7 @@ class BookScraper:
                 break
 
             try:
-                url = f"{self.base_url}/explore/page/{page_num}"
+                url = f"{self.base_url}/explore/page/{page_num}/"
                 html = await self.fetch(session, url)
 
                 if not html:
@@ -1007,9 +1092,9 @@ class BookScraper:
 
         db_task = None
         try:
-            conn = aiohttp.TCPConnector(limit=0)
+            connector = self._build_connector()
 
-            async with aiohttp.ClientSession(connector=conn) as session:
+            async with aiohttp.ClientSession(connector=connector) as session:
                 start = self.args.start_page
                 end = self.args.end_page or await self.get_total_pages(session)
 
@@ -1117,6 +1202,15 @@ if __name__ == "__main__":
     parser.add_argument("--workers", type=int, default=20)
     parser.add_argument("--timeout", type=int, default=30)
     parser.add_argument("--retries", type=int, default=3)
+    parser.add_argument(
+        "--proxy",
+        default=None,
+        help=(
+            "HTTP(S) or SOCKS proxy for asbook fetches, e.g. "
+            "http://user:pass@host:8080 or socks5://127.0.0.1:1080. "
+            "Overrides SCRAPER_PROXY / HTTP_PROXY env."
+        ),
+    )
 
     args = parser.parse_args()
 

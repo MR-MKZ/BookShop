@@ -50,6 +50,7 @@ app.add_middleware(
 class CartCountMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         request.state.cart_count = 0
+        request.state.nav_categories = []
         try:
             async with AsyncSessionLocal() as db:
                 user = None
@@ -57,7 +58,7 @@ class CartCountMiddleware(BaseHTTPMiddleware):
                     from jose import jwt
                     from sqlalchemy import select
 
-                    from app.models import User
+                    from app.models import Category, User
 
                     token = None
                     cookie = request.cookies.get("access_token")
@@ -73,9 +74,21 @@ class CartCountMiddleware(BaseHTTPMiddleware):
                             user = result.scalar_one_or_none()
                 except Exception:
                     user = None
+                try:
+                    cats = (
+                        await db.execute(
+                            select(Category)
+                            .where(Category.is_active == True)  # noqa: E712
+                            .order_by(Category.sort_order.asc(), Category.name.asc())
+                        )
+                    ).scalars().all()
+                    request.state.nav_categories = list(cats)
+                except Exception:
+                    request.state.nav_categories = []
                 request.state.cart_count = await cart_count_for_request(db, request, user)
         except Exception:
             request.state.cart_count = 0
+            request.state.nav_categories = []
         return await call_next(request)
 
 
@@ -102,6 +115,11 @@ app.include_router(checkout.router, tags=["checkout"])
 app.include_router(payment.router, tags=["payment"])
 app.include_router(media.router, tags=["media"])
 app.include_router(admin.router, tags=["admin"])
+
+# Sitemap via fastapi-sitemap (dynamic rebuild; see app.services.sitemap)
+from app.services.sitemap import attach_sitemap  # noqa: E402
+
+attach_sitemap(app)
 
 
 @app.exception_handler(AdminAuthRedirect)

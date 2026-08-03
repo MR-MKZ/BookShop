@@ -2,6 +2,7 @@ aiofiles==25.1.0
 aioftp==0.27.2
 aiohappyeyeballs==2.6.1
 aiohttp==3.13.2
+aiohttp-socks==0.10.1
 aiosignal==1.4.0
 aiosqlite==0.22.1
 alembic==1.18.4
@@ -22,6 +23,8 @@ email-validator==2.3.0
 fastapi==0.129.0
 fastapi-cli==0.0.23
 fastapi-cloud-cli==0.13.0
+# fastapi-sitemap==1.0.4 — install separately: pip install --no-deps fastapi-sitemap==1.0.4
+# (PyPI pin is fastapi<0.116; package only needs SiteMap helpers)
 fastar==0.8.0
 frozenlist==1.8.0
 greenlet==3.3.1

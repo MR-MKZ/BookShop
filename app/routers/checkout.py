@@ -43,9 +43,10 @@ from app.services.checkout_helpers import (
     ORDER_ACCESS_COOKIE_MAX_AGE,
     compute_discount,
     find_valid_coupon,
-
+    format_pending_file_message,
     get_download_ttl_hours,
     get_download_ttl_seconds,
+    get_pending_file_message_template,
     new_order_access_token,
     validate_email,
 )
@@ -86,7 +87,7 @@ async def _books_for_checkout(
         if user and await _owns_book(db, user.id, book.id):
             await db.delete(cart_row)
             continue
-        if not book.has_pdf or not book.is_active:
+        if not book.is_active:
             continue
         seen.add(book.id)
         to_buy.append(book)
@@ -366,6 +367,7 @@ async def place_order(
             OrderItem(
                 order_id=order.id,
                 book_id=book.id,
+                book_title=book.display_title,
                 price=round_toman(book.price),
                 quantity=1,
             )
@@ -510,24 +512,42 @@ async def order_thanks(
         return RedirectResponse(url="/orders/recover", status_code=status.HTTP_303_SEE_OTHER)
 
     downloads = []
+    pending_files = []
     ttl_hours = await get_download_ttl_hours(db)
     if order.status == OrderStatus.PAID:
         ttl = await get_download_ttl_seconds(db)
+        pending_tpl = await get_pending_file_message_template(db)
+        phone = order.billing_phone or ""
+        email = order.billing_email or ""
         for item in order.items:
-            if not item.book or not item.book.has_pdf:
-                continue
-            tok = make_download_token(
-                item.book,
-                user_id=order.user_id,
-                order_id=order.id,
-                ttl_seconds=ttl,
-            )
-            downloads.append(
-                {
-                    "book": item.book,
-                    "url": download_url(item.book, tok),
-                }
-            )
+            title = item.display_title
+            if item.book and item.book.has_file_ready:
+                tok = make_download_token(
+                    item.book,
+                    user_id=order.user_id,
+                    order_id=order.id,
+                    ttl_seconds=ttl,
+                )
+                downloads.append(
+                    {
+                        "book": item.book,
+                        "title": title,
+                        "url": download_url(item.book, tok),
+                    }
+                )
+            else:
+                pending_files.append(
+                    {
+                        "title": title,
+                        "message": format_pending_file_message(
+                            pending_tpl,
+                            order_id=order.id,
+                            book_title=title,
+                            phone=phone,
+                            email=email,
+                        ),
+                    }
+                )
 
     response = templates.TemplateResponse(
         "order_thanks.html",
@@ -536,6 +556,7 @@ async def order_thanks(
             "current_user": current_user,
             "order": order,
             "downloads": downloads,
+            "pending_files": pending_files,
             "ttl_hours": ttl_hours,
             "query": "",
             "paid": order.status == OrderStatus.PAID,
@@ -655,9 +676,9 @@ async def buy_now(
             select(Book).where(Book.id == book_id, Book.is_active == True)  # noqa: E712
         )
     ).scalar_one_or_none()
-    if not book or not book.has_pdf:
+    if not book:
         return RedirectResponse(
-            url=book.path if book else "/search",
+            url="/search",
             status_code=status.HTTP_303_SEE_OTHER,
         )
 

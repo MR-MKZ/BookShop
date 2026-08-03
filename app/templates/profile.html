@@ -63,8 +63,8 @@
                                     <h3><a href="{{ item.book.path }}" title="{{ item.book.display_title }}">{{ item.book.display_title }}</a></h3>
                                     <p>{{ item.book.author or 'نویسنده نامشخص' }}</p>
                                     <div class="properties-footer">
-                                        {% if item.token %}
-                                            <a href="/media/proxy/book/{{ item.book.folder_name }}/{{ item.book.pdf_filename }}?token={{ item.token }}"
+                                        {% if item.download_href %}
+                                            <a href="{{ item.download_href }}"
                                                class="library-download-btn">دانلود کتاب</a>
                                         {% else %}
                                             <span class="library-download-btn is-disabled">فایل به‌زودی</span>

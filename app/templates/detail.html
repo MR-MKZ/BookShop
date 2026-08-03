@@ -67,7 +67,7 @@
         "url": {{ (site_origin ~ book.path)|tojson }},
         "priceCurrency": "IRR",
         "price": {{ (sale or 0)|tojson }},
-        "availability": "{% if book.has_pdf %}https://schema.org/InStock{% else %}https://schema.org/PreOrder{% endif %}",
+        "availability": "https://schema.org/InStock",
         "itemCondition": "https://schema.org/NewCondition"
       },
       "provider": {
@@ -142,14 +142,12 @@
 
                         <div class="book-actions">
                             {% if owned %}
-                                {% if book.has_pdf and token %}
-                                    <a href="/media/proxy/book/{{ book.folder_name }}/{{ filename }}?token={{ token }}"
+                                {% if token %}
+                                    <a href="{{ download_href }}"
                                        class="white-btn">دانلود کتاب</a>
                                 {% else %}
                                     <span class="status-pill is-disabled">خریداری شده — فایل به‌زودی</span>
                                 {% endif %}
-                            {% elif not book.has_pdf %}
-                                <span class="status-pill is-disabled">فعلاً موجود نیست</span>
                             {% else %}
                                 <form action="/cart/add/{{ book.id }}" method="post">
                                     <button type="submit" class="white-btn">افزودن به سبد خرید</button>
@@ -261,7 +259,7 @@
                                 {% endif %}
                                 <tr>
                                     <td class="first">وضعیت فایل</td>
-                                    <td class="second">{% if book.has_pdf %}آماده دانلود{% else %}به‌زودی{% endif %}</td>
+                                    <td class="second">{% if book.has_file_ready %}آماده دانلود{% else %}پس از خرید آماده‌سازی می‌شود{% endif %}</td>
                                 </tr>
                                 {% if book.availability %}
                                 <tr>

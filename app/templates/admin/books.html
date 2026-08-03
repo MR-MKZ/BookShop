@@ -50,7 +50,15 @@
                 {% endif %}
             </td>
             <td>{% if book.is_active %}فعال{% else %}غیرفعال{% endif %}</td>
-            <td><a class="btn btn-sm btn-secondary" href="/admin/books/{{ book.id }}">ویرایش</a></td>
+            <td>
+                <div class="btn-row btn-row-sm">
+                    <a class="btn btn-sm btn-secondary" href="/admin/books/{{ book.id }}">ویرایش</a>
+                    <form method="post" action="/admin/books/{{ book.id }}/delete"
+                          onsubmit="return confirm('حذف کامل کتاب #{{ book.id }}؟');">
+                        <button class="btn btn-sm btn-danger" type="submit">حذف</button>
+                    </form>
+                </div>
+            </td>
         </tr>
         {% else %}
         <tr><td colspan="7">موردی یافت نشد</td></tr>

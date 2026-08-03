@@ -16,13 +16,17 @@ from app.database import get_async_db
 from app.models import (
     HERO_CAROUSEL_SECONDS_DEFAULT,
     HERO_CAROUSEL_SECONDS_KEY,
+    HOME_CATEGORY_BOOKS_LIMIT_DEFAULT,
+    HOME_CATEGORY_BOOKS_LIMIT_KEY,
     AppSetting,
     Book,
+    Category,
     HeroSlide,
     Order,
     OrderItem,
     OrderStatus,
     User,
+    book_categories,
 )
 from app.services.checkout_helpers import get_download_ttl_seconds
 from app.services.downloads import download_url, make_download_token
@@ -96,6 +100,53 @@ async def home(
         seconds = HERO_CAROUSEL_SECONDS_DEFAULT
     seconds = max(3, min(seconds, 120))
 
+    limit_row = (
+        await db.execute(
+            select(AppSetting).where(AppSetting.key == HOME_CATEGORY_BOOKS_LIMIT_KEY)
+        )
+    ).scalar_one_or_none()
+    try:
+        cat_limit = (
+            int(limit_row.value) if limit_row else HOME_CATEGORY_BOOKS_LIMIT_DEFAULT
+        )
+    except (TypeError, ValueError):
+        cat_limit = HOME_CATEGORY_BOOKS_LIMIT_DEFAULT
+    cat_limit = max(1, min(cat_limit, 48))
+
+    home_cats = list(
+        (
+            await db.execute(
+                select(Category)
+                .where(
+                    and_(
+                        Category.is_active == True,  # noqa: E712
+                        Category.show_on_home == True,  # noqa: E712
+                    )
+                )
+                .order_by(Category.sort_order.asc(), Category.name.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    home_category_sections = []
+    for cat in home_cats:
+        books_result = await db.execute(
+            select(Book)
+            .join(book_categories, book_categories.c.book_id == Book.id)
+            .where(
+                and_(
+                    book_categories.c.category_id == cat.id,
+                    Book.is_active == True,  # noqa: E712
+                )
+            )
+            .order_by(desc(Book.created_at))
+            .limit(cat_limit)
+        )
+        cat_books = list(books_result.scalars().all())
+        if cat_books:
+            home_category_sections.append({"category": cat, "books": cat_books})
+
     return templates.TemplateResponse(
         "index.html",
         {
@@ -103,6 +154,104 @@ async def home(
             "books": new_books,
             "hero_slides": hero_slides,
             "hero_interval_ms": seconds * 1000,
+            "home_categories": home_cats,
+            "home_category_sections": home_category_sections,
+            "query": "",
+            "current_user": current_user,
+        },
+    )
+
+
+@router.get("/categories")
+async def categories_index(
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User | None = Depends(get_current_user_optional),
+):
+    cats = list(
+        (
+            await db.execute(
+                select(Category)
+                .where(Category.is_active == True)  # noqa: E712
+                .order_by(Category.sort_order.asc(), Category.name.asc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return templates.TemplateResponse(
+        "categories.html",
+        {
+            "request": request,
+            "categories": cats,
+            "query": "",
+            "current_user": current_user,
+        },
+    )
+
+
+@router.get("/category/{slug}")
+async def category_detail(
+    slug: str,
+    request: Request,
+    page: int = 1,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User | None = Depends(get_current_user_optional),
+):
+    page = max(1, page)
+    cat = (
+        await db.execute(
+            select(Category).where(
+                and_(Category.slug == slug, Category.is_active == True)  # noqa: E712
+            )
+        )
+    ).scalar_one_or_none()
+    if not cat:
+        raise HTTPException(status_code=404, detail="دسته یافت نشد")
+
+    count_q = (
+        select(func.count())
+        .select_from(Book)
+        .join(book_categories, book_categories.c.book_id == Book.id)
+        .where(
+            and_(
+                book_categories.c.category_id == cat.id,
+                Book.is_active == True,  # noqa: E712
+            )
+        )
+    )
+    total = await db.scalar(count_q) or 0
+    total_pages = max(1, ceil(total / PAGE_SIZE)) if total else 0
+
+    books = list(
+        (
+            await db.execute(
+                select(Book)
+                .join(book_categories, book_categories.c.book_id == Book.id)
+                .where(
+                    and_(
+                        book_categories.c.category_id == cat.id,
+                        Book.is_active == True,  # noqa: E712
+                    )
+                )
+                .order_by(desc(Book.created_at))
+                .offset((page - 1) * PAGE_SIZE)
+                .limit(PAGE_SIZE)
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+    return templates.TemplateResponse(
+        "category.html",
+        {
+            "request": request,
+            "category": cat,
+            "books": books,
+            "page": page,
+            "total_pages": total_pages,
+            "total": total,
             "query": "",
             "current_user": current_user,
         },
@@ -220,10 +369,12 @@ async def book_detail(
 
     owned = False
     download_token = None
+    download_href = None
     if current_user:
         owned = await _user_owns_book(db, current_user.id, book.id)
-        if owned and book.has_pdf:
+        if owned and book.has_file_ready:
             download_token = await _download_token_for(db, book, current_user.id)
+            download_href = download_url(book, download_token)
 
     return templates.TemplateResponse(
         "detail.html",
@@ -232,7 +383,8 @@ async def book_detail(
             "book": book,
             "owned": owned,
             "token": download_token,
-            "filename": book.pdf_filename if book.has_pdf else None,
+            "download_href": download_href,
+            "filename": None,
             "query": "",
             "current_user": current_user,
         },
@@ -270,9 +422,18 @@ async def profile(
                 continue
             seen.add(item.book_id)
             token = None
-            if item.book.has_pdf:
+            href = None
+            if item.book.has_file_ready:
                 token = await _download_token_for(db, item.book, current_user.id)
-            library.append({"book": item.book, "token": token, "order": order})
+                href = download_url(item.book, token)
+            library.append(
+                {
+                    "book": item.book,
+                    "token": token,
+                    "download_href": href,
+                    "order": order,
+                }
+            )
 
     return templates.TemplateResponse(
         "profile.html",
@@ -295,7 +456,7 @@ async def download_book(
     """Issue a timed download URL only if the user has purchased the book."""
     result = await db.execute(select(Book).where(Book.id == book_id))
     book = result.scalar_one_or_none()
-    if not book or not book.has_pdf:
+    if not book or not book.has_file_ready:
         raise HTTPException(status_code=404, detail="فایل موجود نیست")
 
     if not await _user_owns_book(db, current_user.id, book.id):

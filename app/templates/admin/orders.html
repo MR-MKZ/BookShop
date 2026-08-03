@@ -54,7 +54,7 @@
             <td dir="ltr">{{ o.payment_gateway_ref_id or '—' }}</td>
             <td>
                 {% for item in o.items %}
-                    {{ item.book.title if item.book else item.book_id }}{% if not loop.last %}، {% endif %}
+                    {{ item.display_title }}{% if not loop.last %}، {% endif %}
                 {% endfor %}
             </td>
             <td class="date-fa" title="ساعت تهران">{{ o.created_at|jalali }}</td>

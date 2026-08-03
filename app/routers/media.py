@@ -1,15 +1,21 @@
 import hashlib
 import logging
 import os
+from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 import aiofiles
-from fastapi import APIRouter, HTTPException, Query, Request
+import aiohttp
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse, Response
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models import Book
+from app.database import get_async_db
+from app.models import Book, DownloadLink
 
 router = APIRouter(prefix="/media/proxy", tags=["media"])
 logger = logging.getLogger(__name__)
@@ -240,14 +246,106 @@ async def proxy_hero(filename: str, request: Request):
     )
 
 
+async def stream_external_url(url: str):
+    """Stream a remote file through our server so the client never sees the URL."""
+    timeout = aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=120)
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.get(url, allow_redirects=True) as resp:
+                if resp.status >= 400:
+                    logger.error("External download upstream status %s", resp.status)
+                    return
+                async for chunk in resp.content.iter_chunked(8192):
+                    if chunk:
+                        yield chunk
+    except Exception as e:
+        logger.error("External download stream error: %s", type(e).__name__)
+        return
+
+
+async def external_url_reachable(url: str) -> bool:
+    """Lightweight check before streaming; never exposes the URL to clients."""
+    timeout = aiohttp.ClientTimeout(total=20, sock_connect=10, sock_read=15)
+    try:
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.head(url, allow_redirects=True) as resp:
+                if resp.status < 400:
+                    return True
+                # Some hosts reject HEAD; try a ranged GET
+            async with session.get(
+                url, allow_redirects=True, headers={"Range": "bytes=0-0"}
+            ) as resp:
+                return resp.status < 400
+    except Exception as e:
+        logger.error("External download probe failed: %s", type(e).__name__)
+        return False
+
+
+def _is_http_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+    return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+
+@router.get("/category/{filename}")
+async def proxy_category_image(filename: str, request: Request):
+    """Public category images (local MEDIA_ROOT/categories)."""
+    if not is_safe_path(filename):
+        raise HTTPException(status_code=403, detail="Invalid path")
+    allowed_exts = {".jpg", ".jpeg", ".png", ".webp"}
+    _, ext = os.path.splitext(filename.lower())
+    if ext not in allowed_exts:
+        raise HTTPException(status_code=403, detail="Invalid media type")
+
+    path = Path(settings.MEDIA_ROOT) / "categories" / filename
+    if not path.is_file():
+        if DEFAULT_COVER_PATH.is_file():
+            return FileResponse(
+                DEFAULT_COVER_PATH,
+                media_type="image/jpeg",
+                headers={"Cache-Control": DEFAULT_COVER_CACHE_CONTROL},
+            )
+        raise HTTPException(status_code=404, detail="Category image not found")
+
+    etag = _cover_etag("categories", filename)
+    if_none_match = request.headers.get("if-none-match")
+    if if_none_match and if_none_match == etag:
+        return Response(
+            status_code=304,
+            headers={"ETag": etag, "Cache-Control": HERO_CACHE_CONTROL},
+        )
+
+    media_type = "image/jpeg"
+    if ext == ".png":
+        media_type = "image/png"
+    elif ext == ".webp":
+        media_type = "image/webp"
+    return FileResponse(
+        path,
+        media_type=media_type,
+        headers={"Cache-Control": HERO_CACHE_CONTROL, "ETag": etag},
+    )
+
+
 @router.get("/book/{folder_name}/{filename}")
-async def proxy_book(folder_name: str, filename: str, token: str = Query(...)):
+async def proxy_book(
+    folder_name: str,
+    filename: str,
+    token: str = Query(...),
+    db: AsyncSession = Depends(get_async_db),
+):
     """
     Protected access to book files with timed token.
-    Token must include matching folder/filename and optionally user_id/book_id.
-    Payload may include ``exp`` (unix timestamp) for admin-configured TTL.
+    External host URLs are resolved server-side from the DB and never appear
+    in the token, query string, or redirect Location header.
     """
-    from app.services.downloads import DOWNLOAD_SIGNER_MAX_AGE, token_expired
+    from app.services.downloads import (
+        DOWNLOAD_SIGNER_MAX_AGE,
+        EXTERNAL_PROXY_FILENAME,
+        token_expired,
+    )
 
     try:
         data = signer.loads(token, salt="pdf-download", max_age=DOWNLOAD_SIGNER_MAX_AGE)
@@ -263,14 +361,71 @@ async def proxy_book(folder_name: str, filename: str, token: str = Query(...)):
     except BadSignature:
         raise HTTPException(status_code=403, detail="توکن نامعتبر است")
 
-    if not await check_file_exists(folder_name, filename):
-        raise HTTPException(status_code=404, detail="فایل یافت نشد")
-
     download_name = data.get("download_name") if isinstance(data, dict) else None
     book_id = data.get("book_id") if isinstance(data, dict) else None
+    link_id = data.get("link_id") if isinstance(data, dict) else None
 
-    return StreamingResponse(
-        stream_media(folder_name, filename),
-        media_type=book_media_type(filename),
-        headers=_attachment_headers(filename, download_name, book_id),
-    )
+    if link_id is not None:
+        link = (
+            await db.execute(
+                select(DownloadLink).where(DownloadLink.id == int(link_id))
+            )
+        ).scalar_one_or_none()
+        now = datetime.now(timezone.utc)
+        if (
+            not link
+            or link.revoked_at is not None
+            or (link.expires_at and link.expires_at <= now)
+        ):
+            raise HTTPException(status_code=403, detail="لینک دانلود منقضی شده است")
+        if book_id is not None and link.book_id and int(link.book_id) != int(book_id):
+            raise HTTPException(status_code=403, detail="توکن نامعتبر است")
+        link.download_count = int(link.download_count or 0) + 1
+        link.used_at = now
+        link.is_used = True
+        await db.commit()
+
+    book: Book | None = None
+    if book_id is not None:
+        book = (
+            await db.execute(select(Book).where(Book.id == int(book_id)))
+        ).scalar_one_or_none()
+
+    # Prefer local/FTP file when present
+    local_name = filename
+    if book and book.file_filename:
+        local_name = book.pdf_filename
+        if await check_file_exists(folder_name, local_name):
+            return StreamingResponse(
+                stream_media(folder_name, local_name),
+                media_type=book_media_type(local_name),
+                headers=_attachment_headers(
+                    local_name, download_name or book.download_filename, book.id
+                ),
+            )
+
+    if filename != EXTERNAL_PROXY_FILENAME and await check_file_exists(
+        folder_name, filename
+    ):
+        return StreamingResponse(
+            stream_media(folder_name, filename),
+            media_type=book_media_type(filename),
+            headers=_attachment_headers(filename, download_name, book_id),
+        )
+
+    # External URL: load only from DB — never from token / redirects / HTML
+    external = (book.external_file_url or "").strip() if book else ""
+    if external and _is_http_url(external):
+        if not await external_url_reachable(external):
+            raise HTTPException(status_code=404, detail="فایل یافت نشد")
+        out_name = download_name or (
+            book.download_filename if book else filename
+        )
+        media = book_media_type(out_name)
+        return StreamingResponse(
+            stream_external_url(external),
+            media_type=media,
+            headers=_attachment_headers(out_name, out_name, book_id),
+        )
+
+    raise HTTPException(status_code=404, detail="فایل یافت نشد")

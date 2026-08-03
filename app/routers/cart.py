@@ -133,8 +133,6 @@ async def add_to_cart(
     ).scalar_one_or_none()
     if not book:
         raise HTTPException(status_code=404, detail="کتاب یافت نشد")
-    if not book.has_pdf:
-        raise HTTPException(status_code=400, detail="فایل این کتاب آماده فروش نیست")
 
     if current_user and await _owns_book(db, current_user.id, book_id):
         return RedirectResponse(url="/profile", status_code=status.HTTP_303_SEE_OTHER)

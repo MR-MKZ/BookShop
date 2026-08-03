@@ -31,17 +31,24 @@ from app.auth import get_current_user_optional, get_password_hash
 from app.config import settings
 from app.database import get_async_db
 from app.models import (
+    CATEGORY_FOLDER,
     HERO_CAROUSEL_SECONDS_DEFAULT,
     HERO_CAROUSEL_SECONDS_KEY,
     HERO_FOLDER,
     HERO_MIN_SIZE,
     HERO_RECOMMENDED_SIZE,
+    HOME_CATEGORY_BOOKS_LIMIT_DEFAULT,
+    HOME_CATEGORY_BOOKS_LIMIT_KEY,
     DOWNLOAD_LINK_TTL_HOURS_DEFAULT,
     DOWNLOAD_LINK_TTL_HOURS_KEY,
+    PENDING_FILE_CUSTOMER_MESSAGE_DEFAULT,
+    PENDING_FILE_CUSTOMER_MESSAGE_KEY,
     AppSetting,
     Book,
+    Category,
     Coupon,
     DiscountType,
+    DownloadLink,
     HeroSlide,
     Order,
     OrderItem,
@@ -52,6 +59,12 @@ from app.models import (
     UserRole,
 )
 from app.routers.media import check_file_exists, signer
+from app.services.checkout_helpers import get_download_ttl_hours
+from app.services.downloads import (
+    create_managed_download_link,
+    download_url,
+    make_download_token,
+)
 from app.utils.phone import validate_iran_phone
 from app.utils.datetime_fa import (
     ORDER_STATUS_FA,
@@ -811,15 +824,60 @@ async def admin_book_create(
             book.file_format = ext
             filename = Book.build_stored_filename(book.id, ext)
             await _upload_book_file(folder_name, filename, data)
-            book.has_pdf = True
             book.file_filename = filename
             book.file_size = f"{len(data) // 1024} KB"
+            book.sync_has_pdf()
 
     await db.commit()
     return RedirectResponse(
         url=f"/admin/books/{book.id}?msg=created",
         status_code=status.HTTP_303_SEE_OTHER,
     )
+
+
+async def _all_categories(db: AsyncSession) -> list[Category]:
+    return list(
+        (
+            await db.execute(
+                select(Category).order_by(
+                    Category.sort_order.asc(), Category.name.asc()
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+
+
+async def _book_edit_context(
+    request: Request,
+    db: AsyncSession,
+    admin: User,
+    book: Book,
+    *,
+    error: str | None = None,
+    message: str | None = None,
+    generated_link: str | None = None,
+) -> dict:
+    await db.refresh(book, attribute_names=["categories"])
+    file_exists = False
+    if book.file_filename and book.folder_name:
+        file_exists = (await _resolve_stored_filename(book)) is not None
+    selected_ids = {c.id for c in (book.categories or [])}
+    return {
+        "request": request,
+        "admin": admin,
+        "book": book,
+        "error": error,
+        "message": message or request.query_params.get("msg"),
+        "file_exists": file_exists,
+        "allowed_exts": sorted(ALLOWED_BOOK_EXTS),
+        "categories": await _all_categories(db),
+        "selected_category_ids": selected_ids,
+        "generated_link": generated_link or request.query_params.get("link"),
+        "has_external": bool((book.external_file_url or "").strip()),
+        "ttl_hours": await get_download_ttl_hours(db),
+    }
 
 
 @router.get("/books/{book_id}", response_class=HTMLResponse)
@@ -830,26 +888,18 @@ async def admin_book_edit(
     admin: User = Depends(require_admin),
 ):
     book = (
-        await db.execute(select(Book).where(Book.id == book_id))
+        await db.execute(
+            select(Book)
+            .options(selectinload(Book.categories))
+            .where(Book.id == book_id)
+        )
     ).scalar_one_or_none()
     if not book:
         raise HTTPException(status_code=404)
 
-    file_exists = False
-    if book.has_pdf and book.folder_name:
-        file_exists = (await _resolve_stored_filename(book)) is not None
-
     return templates.TemplateResponse(
         "admin/book_edit.html",
-        {
-            "request": request,
-            "admin": admin,
-            "book": book,
-            "error": None,
-            "message": request.query_params.get("msg"),
-            "file_exists": file_exists,
-            "allowed_exts": sorted(ALLOWED_BOOK_EXTS),
-        },
+        await _book_edit_context(request, db, admin, book),
     )
 
 
@@ -870,27 +920,30 @@ async def admin_book_save(
     admin: User = Depends(require_admin),
 ):
     book = (
-        await db.execute(select(Book).where(Book.id == book_id))
+        await db.execute(
+            select(Book)
+            .options(selectinload(Book.categories))
+            .where(Book.id == book_id)
+        )
     ).scalar_one_or_none()
     if not book:
         raise HTTPException(status_code=404)
 
+    form = await request.form()
+    category_ids: list[int] = []
+    for raw in form.getlist("category_ids"):
+        try:
+            category_ids.append(int(raw))
+        except (TypeError, ValueError):
+            continue
+
     parsed = _parse_price(price, original_price)
     if isinstance(parsed, str):
-        file_exists = False
-        if book.has_pdf and book.folder_name:
-            file_exists = (await _resolve_stored_filename(book)) is not None
         return templates.TemplateResponse(
             "admin/book_edit.html",
-            {
-                "request": request,
-                "admin": admin,
-                "book": book,
-                "error": parsed,
-                "message": None,
-                "file_exists": file_exists,
-                "allowed_exts": sorted(ALLOWED_BOOK_EXTS),
-            },
+            await _book_edit_context(
+                request, db, admin, book, error=parsed
+            ),
         )
     price_val, orig_val = parsed
 
@@ -904,6 +957,20 @@ async def admin_book_save(
     book.original_price = orig_val
     book.is_active = is_active is not None
     book.slug = Book.build_slug(book.title_en, book.title, book_id=book.id)
+
+    if category_ids:
+        cats = list(
+            (
+                await db.execute(
+                    select(Category).where(Category.id.in_(category_ids))
+                )
+            )
+            .scalars()
+            .all()
+        )
+        book.categories = cats
+    else:
+        book.categories = []
 
     await db.commit()
     return RedirectResponse(
@@ -959,7 +1026,7 @@ async def admin_upload_file(
     folder_name = await _ensure_storage_folder(book)
 
     # Remove previous stored file (any known name)
-    if book.has_pdf:
+    if book.file_filename or book.has_pdf:
         existing = await _resolve_stored_filename(book)
         if existing:
             await _delete_book_file(folder_name, existing)
@@ -972,10 +1039,10 @@ async def admin_upload_file(
             status_code=500,
             detail=f"خطا در آپلود فایل: {e}",
         ) from e
-    book.has_pdf = True
     book.file_format = ext
     book.file_filename = filename
     book.file_size = f"{len(data) // 1024} KB"
+    book.sync_has_pdf()
     await db.commit()
 
     # List uploads stay on the list; edit-page uploads return to edit
@@ -1005,18 +1072,145 @@ async def admin_delete_file(
     if not book:
         raise HTTPException(status_code=404)
 
-    if book.has_pdf and book.folder_name:
+    if book.folder_name:
         existing = await _resolve_stored_filename(book)
         if existing:
             await _delete_book_file(book.folder_name, existing)
 
-    book.has_pdf = False
     book.file_filename = None
     book.file_size = None
+    book.sync_has_pdf()
     await db.commit()
 
     return RedirectResponse(
         url=f"/admin/books/{book.id}?msg=file_deleted",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/books/{book_id}/external-url")
+async def admin_set_external_url(
+    book_id: int,
+    external_url: str = Form(""),
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    book = (
+        await db.execute(select(Book).where(Book.id == book_id))
+    ).scalar_one_or_none()
+    if not book:
+        raise HTTPException(status_code=404)
+
+    url = (external_url or "").strip()
+    if url and not (url.startswith("http://") or url.startswith("https://")):
+        return RedirectResponse(
+            url=f"/admin/books/{book.id}?msg=bad_external_url",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    book.external_file_url = url or None
+    book.sync_has_pdf()
+    await db.commit()
+    return RedirectResponse(
+        url=f"/admin/books/{book.id}?msg=external_saved",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/books/{book_id}/external-url/delete")
+async def admin_clear_external_url(
+    book_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    book = (
+        await db.execute(select(Book).where(Book.id == book_id))
+    ).scalar_one_or_none()
+    if not book:
+        raise HTTPException(status_code=404)
+    book.external_file_url = None
+    book.sync_has_pdf()
+    await db.commit()
+    return RedirectResponse(
+        url=f"/admin/books/{book.id}?msg=external_cleared",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/books/{book_id}/secure-link")
+async def admin_create_secure_link(
+    book_id: int,
+    note: str = Form(""),
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    book = (
+        await db.execute(select(Book).where(Book.id == book_id))
+    ).scalar_one_or_none()
+    if not book:
+        raise HTTPException(status_code=404)
+    if not book.has_file_ready:
+        return RedirectResponse(
+            url=f"/admin/books/{book.id}?msg=no_file_for_link",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    if not book.folder_name:
+        book.folder_name = Book.storage_folder(book.id)
+
+    ttl_hours = await get_download_ttl_hours(db)
+    link, path = await create_managed_download_link(
+        db, book, ttl_hours=ttl_hours, note=note
+    )
+    await db.commit()
+    base = (settings.BASE_URL or "").rstrip("/")
+    full = f"{base}{path}" if base else path
+    from urllib.parse import quote
+
+    return RedirectResponse(
+        url=f"/admin/books/{book.id}?msg=link_created&link={quote(full, safe='')}",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/books/{book_id}/delete")
+async def admin_delete_book(
+    book_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    book = (
+        await db.execute(
+            select(Book)
+            .options(selectinload(Book.categories))
+            .where(Book.id == book_id)
+        )
+    ).scalar_one_or_none()
+    if not book:
+        raise HTTPException(status_code=404)
+
+    # Snapshot titles for any order items still missing them
+    items = (
+        await db.execute(select(OrderItem).where(OrderItem.book_id == book_id))
+    ).scalars().all()
+    for item in items:
+        if not item.book_title:
+            item.book_title = book.display_title
+
+    if book.folder_name:
+        existing = await _resolve_stored_filename(book)
+        if existing:
+            await _delete_book_file(book.folder_name, existing)
+        # Remove cover if present
+        cover = book.cover_filename or "cover.jpg"
+        try:
+            await _delete_book_file(book.folder_name, cover)
+        except Exception:
+            pass
+
+    book.categories = []
+    await db.delete(book)
+    await db.commit()
+    return RedirectResponse(
+        url="/admin/books?msg=deleted",
         status_code=status.HTTP_303_SEE_OTHER,
     )
 
@@ -1030,31 +1224,27 @@ async def admin_download_file(
     book = (
         await db.execute(select(Book).where(Book.id == book_id))
     ).scalar_one_or_none()
-    if not book or not book.has_pdf:
+    if not book or not book.has_file_ready:
         raise HTTPException(status_code=404, detail="فایل موجود نیست")
 
-    filename = await _resolve_stored_filename(book)
-    if not filename:
-        raise HTTPException(status_code=404, detail="فایل روی دیسک/FTP یافت نشد")
+    if book.file_filename:
+        filename = await _resolve_stored_filename(book)
+        if filename and book.file_filename != filename:
+            book.file_filename = filename
+            await db.commit()
 
-    # Sync DB if we recovered a legacy/titled name
-    if book.file_filename != filename:
-        book.file_filename = filename
+    if not book.folder_name:
+        book.folder_name = Book.storage_folder(book.id)
         await db.commit()
 
-    token = signer.dumps(
-        {
-            "folder": book.folder_name,
-            "filename": filename,
-            "download_name": book.download_filename,
-            "user_id": admin.id,
-            "book_id": book.id,
-            "admin": True,
-        },
-        salt="pdf-download",
+    ttl = (await get_download_ttl_hours(db)) * 3600
+    token = make_download_token(
+        book, user_id=admin.id, order_id=None, ttl_seconds=ttl
     )
-    url = f"/media/proxy/book/{book.folder_name}/{filename}?token={token}"
-    return RedirectResponse(url=url, status_code=status.HTTP_303_SEE_OTHER)
+    return RedirectResponse(
+        url=download_url(book, token),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
 
 
 # Users
@@ -1823,6 +2013,19 @@ async def admin_coupons(
         except ValueError:
             pass
 
+    pending_row = (
+        await db.execute(
+            select(AppSetting).where(
+                AppSetting.key == PENDING_FILE_CUSTOMER_MESSAGE_KEY
+            )
+        )
+    ).scalar_one_or_none()
+    pending_message = (
+        pending_row.value
+        if pending_row and pending_row.value
+        else PENDING_FILE_CUSTOMER_MESSAGE_DEFAULT
+    )
+
     return templates.TemplateResponse(
         "admin/coupons.html",
         {
@@ -1833,6 +2036,7 @@ async def admin_coupons(
             "total_pages": total_pages,
             "total": total,
             "ttl_hours": ttl_hours,
+            "pending_message": pending_message,
             "message": request.query_params.get("msg"),
         },
     )
@@ -2146,5 +2350,365 @@ async def admin_coupon_delete(
     await db.commit()
     return RedirectResponse(
         url="/admin/coupons?msg=deleted",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+# Download link management & pending-file message
+
+
+def _remaining_label(expires_at: datetime | None) -> str:
+    if not expires_at:
+        return "—"
+    now = datetime.now(timezone.utc)
+    exp = expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=timezone.utc)
+    delta = exp - now
+    if delta.total_seconds() <= 0:
+        return "منقضی"
+    hours, rem = divmod(int(delta.total_seconds()), 3600)
+    minutes = rem // 60
+    if hours:
+        return f"{hours}س {minutes}د"
+    return f"{minutes} دقیقه"
+
+
+@router.get("/download-links", response_class=HTMLResponse)
+async def admin_download_links(
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    now = datetime.now(timezone.utc)
+    # Purge expired / revoked from the managed list
+    stale = (
+        await db.execute(
+            select(DownloadLink).where(
+                or_(
+                    DownloadLink.revoked_at.is_not(None),
+                    and_(
+                        DownloadLink.expires_at.is_not(None),
+                        DownloadLink.expires_at <= now,
+                    ),
+                )
+            )
+        )
+    ).scalars().all()
+    for row in stale:
+        await db.delete(row)
+    if stale:
+        await db.commit()
+
+    links = list(
+        (
+            await db.execute(
+                select(DownloadLink)
+                .options(selectinload(DownloadLink.book))
+                .order_by(desc(DownloadLink.created_at))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    base = (settings.BASE_URL or "").rstrip("/")
+    rows = []
+    for link in links:
+        book = link.book
+        if book and link.token:
+            path = download_url(book, link.token)
+            full = f"{base}{path}" if base else path
+        else:
+            full = ""
+        rows.append(
+            {
+                "link": link,
+                "book_title": book.display_title if book else "کتاب حذف‌شده",
+                "url": full,
+                "created_fa": format_jalali(link.created_at),
+                "remaining": _remaining_label(link.expires_at),
+            }
+        )
+
+    return templates.TemplateResponse(
+        "admin/download_links.html",
+        {
+            "request": request,
+            "admin": admin,
+            "rows": rows,
+            "message": request.query_params.get("msg"),
+        },
+    )
+
+
+@router.post("/download-links/{link_id}/revoke")
+async def admin_revoke_download_link(
+    link_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    link = (
+        await db.execute(select(DownloadLink).where(DownloadLink.id == link_id))
+    ).scalar_one_or_none()
+    if not link:
+        raise HTTPException(status_code=404)
+    await db.delete(link)
+    await db.commit()
+    return RedirectResponse(
+        url="/admin/download-links?msg=revoked",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/settings/pending-file-message")
+async def admin_save_pending_file_message(
+    message: str = Form(...),
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    value = (message or "").strip() or PENDING_FILE_CUSTOMER_MESSAGE_DEFAULT
+    row = (
+        await db.execute(
+            select(AppSetting).where(
+                AppSetting.key == PENDING_FILE_CUSTOMER_MESSAGE_KEY
+            )
+        )
+    ).scalar_one_or_none()
+    if row:
+        row.value = value
+    else:
+        db.add(AppSetting(key=PENDING_FILE_CUSTOMER_MESSAGE_KEY, value=value))
+    await db.commit()
+    return RedirectResponse(
+        url="/admin/coupons?msg=pending_msg_saved",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/settings/home-category-limit")
+async def admin_save_home_category_limit(
+    limit: str = Form(...),
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    try:
+        value = max(1, min(int(limit), 48))
+    except ValueError:
+        return RedirectResponse(
+            url="/admin/categories?msg=limit_invalid",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    row = (
+        await db.execute(
+            select(AppSetting).where(AppSetting.key == HOME_CATEGORY_BOOKS_LIMIT_KEY)
+        )
+    ).scalar_one_or_none()
+    if row:
+        row.value = str(value)
+    else:
+        db.add(AppSetting(key=HOME_CATEGORY_BOOKS_LIMIT_KEY, value=str(value)))
+    await db.commit()
+    return RedirectResponse(
+        url="/admin/categories?msg=limit_saved",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+# Categories
+
+
+def _category_dir() -> str:
+    path = os.path.join(settings.MEDIA_ROOT, CATEGORY_FOLDER)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+async def _unique_category_slug(
+    db: AsyncSession, name: str, exclude_id: int | None = None
+) -> str:
+    base = Category.slugify(name)
+    slug = base
+    n = 2
+    while True:
+        q = select(Category).where(Category.slug == slug)
+        if exclude_id is not None:
+            q = q.where(Category.id != exclude_id)
+        exists = (await db.execute(q)).scalar_one_or_none()
+        if not exists:
+            return slug
+        slug = f"{base}-{n}"
+        n += 1
+
+
+@router.get("/categories", response_class=HTMLResponse)
+async def admin_categories(
+    request: Request,
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    cats = await _all_categories(db)
+    limit_row = (
+        await db.execute(
+            select(AppSetting).where(AppSetting.key == HOME_CATEGORY_BOOKS_LIMIT_KEY)
+        )
+    ).scalar_one_or_none()
+    home_limit = HOME_CATEGORY_BOOKS_LIMIT_DEFAULT
+    if limit_row:
+        try:
+            home_limit = int(limit_row.value)
+        except ValueError:
+            pass
+    return templates.TemplateResponse(
+        "admin/categories.html",
+        {
+            "request": request,
+            "admin": admin,
+            "categories": cats,
+            "home_limit": home_limit,
+            "message": request.query_params.get("msg"),
+            "error": request.query_params.get("error"),
+            "allowed_exts": sorted(ALLOWED_COVER_EXTS),
+        },
+    )
+
+
+@router.post("/categories/new")
+async def admin_category_create(
+    name: str = Form(...),
+    description: str = Form(""),
+    sort_order: int = Form(0),
+    show_on_home: str | None = Form(None),
+    is_active: str | None = Form(None),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    name = name.strip()
+    if not name:
+        return RedirectResponse(
+            url="/admin/categories?error=empty_name",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    slug = await _unique_category_slug(db, name)
+    image_filename = None
+    if image and image.filename:
+        ext = _file_ext(image.filename)
+        if ext not in ALLOWED_COVER_EXTS:
+            return RedirectResponse(
+                url="/admin/categories?error=bad_ext",
+                status_code=status.HTTP_303_SEE_OTHER,
+            )
+        data = await image.read()
+        if data:
+            image_filename = (
+                f"cat_{uuid.uuid4().hex[:12]}.{ext if ext != 'jpeg' else 'jpg'}"
+            )
+            with open(os.path.join(_category_dir(), image_filename), "wb") as f:
+                f.write(data)
+
+    db.add(
+        Category(
+            name=name,
+            slug=slug,
+            description=description.strip() or None,
+            image_filename=image_filename,
+            sort_order=sort_order,
+            show_on_home=show_on_home is not None,
+            is_active=is_active is not None,
+        )
+    )
+    await db.commit()
+    return RedirectResponse(
+        url="/admin/categories?msg=created",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/categories/{category_id}/edit")
+async def admin_category_edit(
+    category_id: int,
+    name: str = Form(...),
+    description: str = Form(""),
+    sort_order: int = Form(0),
+    show_on_home: str | None = Form(None),
+    is_active: str | None = Form(None),
+    image: UploadFile | None = File(None),
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    cat = (
+        await db.execute(select(Category).where(Category.id == category_id))
+    ).scalar_one_or_none()
+    if not cat:
+        raise HTTPException(status_code=404)
+
+    name = name.strip()
+    if not name:
+        return RedirectResponse(
+            url="/admin/categories?error=empty_name",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    cat.name = name
+    cat.slug = await _unique_category_slug(db, name, exclude_id=cat.id)
+    cat.description = description.strip() or None
+    cat.sort_order = sort_order
+    cat.show_on_home = show_on_home is not None
+    cat.is_active = is_active is not None
+
+    if image and image.filename:
+        ext = _file_ext(image.filename)
+        if ext not in ALLOWED_COVER_EXTS:
+            return RedirectResponse(
+                url="/admin/categories?error=bad_ext",
+                status_code=status.HTTP_303_SEE_OTHER,
+            )
+        data = await image.read()
+        if data:
+            if cat.image_filename:
+                old = os.path.join(_category_dir(), cat.image_filename)
+                if os.path.isfile(old):
+                    try:
+                        os.remove(old)
+                    except OSError:
+                        pass
+            filename = (
+                f"cat_{uuid.uuid4().hex[:12]}.{ext if ext != 'jpeg' else 'jpg'}"
+            )
+            with open(os.path.join(_category_dir(), filename), "wb") as f:
+                f.write(data)
+            cat.image_filename = filename
+
+    await db.commit()
+    return RedirectResponse(
+        url="/admin/categories?msg=saved",
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
+@router.post("/categories/{category_id}/delete")
+async def admin_category_delete(
+    category_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    cat = (
+        await db.execute(
+            select(Category)
+            .options(selectinload(Category.books))
+            .where(Category.id == category_id)
+        )
+    ).scalar_one_or_none()
+    if not cat:
+        raise HTTPException(status_code=404)
+    if cat.image_filename:
+        path = os.path.join(_category_dir(), cat.image_filename)
+        if os.path.isfile(path):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+    cat.books = []
+    await db.delete(cat)
+    await db.commit()
+    return RedirectResponse(
+        url="/admin/categories?msg=deleted",
         status_code=status.HTTP_303_SEE_OTHER,
     )

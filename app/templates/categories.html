@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}دسته‌بندی کتاب‌ها — لامابوک{% endblock %}
+{% block meta_description %}مرور دسته‌بندی‌های موضوعی کتاب‌های الکترونیکی لامابوک.{% endblock %}
+{% block canonical_url %}{{ site_origin }}/categories{% endblock %}
+
+{% block breadcrumb %}
+<div class="breadcrumb-items">
+    <div class="row">
+        <ul class="breadcrumb">
+            <li><a href="/" class="breadcrumb-link">صفحه اصلی</a></li>
+            <li class="chevron"><span class="fa fa-chevron-left"></span></li>
+            <li><span class="breadcrumb-active">دسته‌بندی‌ها</span></li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="slider-area">
+    <div class="single-slider slider-height2 slider-bg2 d-flex align-items-center">
+        <div class="container">
+            <div class="row">
+                <div class="col-xl-12">
+                    <div class="hero-caption hero-caption2">
+                        <h2>دسته‌بندی موضوعی</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="categories-slider section-padding">
+    <div class="container">
+        <div class="row">
+            {% for cat in categories %}
+            <div class="col-xxl-3 col-xl-3 col-lg-4 col-md-6 col-sm-6 mb-4">
+                <div class="category-item">
+                    <a href="{{ cat.path }}" class="category-img">
+                        <img src="{{ cat.image_url or '/static/img/book/default.png' }}"
+                             alt="{{ cat.name }}"
+                             loading="lazy"
+                             onerror="this.onerror=null;this.src='/static/img/book/default.png'">
+                    </a>
+                    <a class="category-caption" href="{{ cat.path }}">{{ cat.name }}</a>
+                </div>
+            </div>
+            {% else %}
+            <div class="col-12">
+                <div class="catalog-empty">
+                    <p>هنوز دسته‌بندی‌ای ثبت نشده است.</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

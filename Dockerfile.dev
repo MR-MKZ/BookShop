@@ -7,7 +7,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY ./requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt
+# fastapi-sitemap pins fastapi<0.116; install --no-deps (API is tiny / compatible)
+RUN pip install --no-cache-dir --upgrade -r /app/requirements.txt \
+    && pip install --no-cache-dir --no-deps fastapi-sitemap==1.0.4
 
 COPY ./alembic.docker.ini /app/alembic.ini
 COPY ./ruff.toml /app/ruff.toml

@@ -1,0 +1,52 @@
+{% extends "admin/base.html" %}
+{% block title %}لینک‌های دانلود{% endblock %}
+{% block content %}
+<h1>لینک‌های دانلود امن</h1>
+{% if message == 'revoked' %}
+<div class="msg">لینک باطل و از لیست حذف شد.</div>
+{% elif message %}
+<div class="msg">{{ message }}</div>
+{% endif %}
+<p style="color:#64748b;font-size:.9rem;">لینک‌های منقضی یا باطل‌شده به‌صورت خودکار از این لیست حذف می‌شوند. زمان‌ها به وقت تهران (جلالی) است.</p>
+<table>
+    <thead>
+        <tr>
+            <th>کتاب</th>
+            <th>تاریخ ساخت</th>
+            <th>باقیمانده</th>
+            <th>دانلودها</th>
+            <th>یادداشت</th>
+            <th>لینک</th>
+            <th>عملیات</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in rows %}
+        <tr>
+            <td>{{ row.book_title }}</td>
+            <td class="date-fa">{{ row.created_fa }}</td>
+            <td>{{ row.remaining }}</td>
+            <td dir="ltr">{{ row.link.download_count }}</td>
+            <td>{{ row.link.note or '—' }}</td>
+            <td>
+                {% if row.url %}
+                <input type="text" readonly dir="ltr" value="{{ row.url }}"
+                       id="link-{{ row.link.id }}"
+                       style="width:180px;font-size:.75rem;padding:4px;">
+                <button class="btn btn-sm btn-secondary" type="button"
+                        onclick="navigator.clipboard.writeText(document.getElementById('link-{{ row.link.id }}').value)">کپی</button>
+                {% else %}—{% endif %}
+            </td>
+            <td>
+                <form method="post" action="/admin/download-links/{{ row.link.id }}/revoke"
+                      onsubmit="return confirm('این لینک باطل شود؟');">
+                    <button class="btn btn-sm btn-danger" type="submit">منقضی کردن</button>
+                </form>
+            </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">لینک فعالی وجود ندارد</td></tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

@@ -1896,6 +1896,17 @@
                                         <ul id="navigation" class="menu">
                                             <li><a href="/">صفحه اصلی</a></li>
                                             <li><a href="/search">کتاب‌ها</a></li>
+                                            {% set nav_cats = request.state.nav_categories|default([]) %}
+                                            {% if nav_cats %}
+                                            <li><a href="/categories">دسته‌بندی</a>
+                                                <ul class="submenu">
+                                                    {% for cat in nav_cats %}
+                                                    <li><a href="{{ cat.path }}">{{ cat.name }}</a></li>
+                                                    {% endfor %}
+                                                    <li><a href="/categories">همه دسته‌ها</a></li>
+                                                </ul>
+                                            </li>
+                                            {% endif %}
                                             <li><a href="/cart">سبد خرید</a></li>
                                             {% if current_user %}
                                                 <li><a href="/profile">کتابخانه من</a></li>
@@ -1956,6 +1967,7 @@
                                     <h4>راهنمای سایت</h4>
                                     <ul>
                                         <li><a href="/search">همه کتاب‌ها</a></li>
+                                        <li><a href="/categories">دسته‌بندی‌ها</a></li>
                                         <li><a href="/cart">سبد خرید</a></li>
                                         <li><a href="/orders/recover">بازیابی سفارش</a></li>
                                         <li><a href="/auth/login">ورود</a></li>
