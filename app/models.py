@@ -231,21 +231,41 @@ class Book(Base):
 
     @staticmethod
     def content_disposition(download_name: str, book_id: int | None = None) -> str:
-        """RFC 5987 Content-Disposition with UTF-8 filename*."""
-        if "." in download_name:
-            stem, ext = download_name.rsplit(".", 1)
+        """RFC 5987 Content-Disposition with UTF-8 filename*.
+
+        The ``filename=`` fallback MUST be latin-1/ASCII-safe (Starlette encodes
+        header values as latin-1). Unicode belongs only in ``filename*=``.
+        """
+        raw = (download_name or "").strip() or (
+            f"book_{book_id}.bin" if book_id else "book.bin"
+        )
+        if "." in raw:
+            stem, ext = raw.rsplit(".", 1)
         else:
-            stem, ext = download_name, "bin"
+            stem, ext = raw, "bin"
         ascii_stem = stem.encode("ascii", "ignore").decode("ascii")
         ascii_stem = re.sub(r'["\\\r\n]', "_", ascii_stem).strip(" ._") or (
             f"book_{book_id}" if book_id else "book"
         )
-        ascii_name = f"{ascii_stem}.{ext}"
-        encoded = quote(download_name, safe="")
-        return (
+        ascii_ext = ext.encode("ascii", "ignore").decode("ascii")
+        ascii_ext = re.sub(r'[^A-Za-z0-9]+', "", ascii_ext).lower() or "bin"
+        ascii_name = f"{ascii_stem}.{ascii_ext}"
+        # Percent-encode the full UTF-8 name for filename*
+        encoded = quote(raw, safe="")
+        header = (
             f'attachment; filename="{ascii_name}"; '
             f"filename*=UTF-8''{encoded}"
         )
+        # Final guard: ASGI requires latin-1 header values
+        try:
+            header.encode("latin-1")
+        except UnicodeEncodeError:
+            fallback = f"book_{book_id}.{ascii_ext}" if book_id else f"book.{ascii_ext}"
+            header = (
+                f'attachment; filename="{fallback}"; '
+                f"filename*=UTF-8''{encoded}"
+            )
+        return header
 
     def ensure_slug(self) -> str:
         """Set slug from title_en/id if missing; return current slug."""
