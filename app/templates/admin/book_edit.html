@@ -20,10 +20,12 @@
 {% if generated_link %}
 <div class="card" style="max-width:720px;margin-bottom:16px;background:#ecfdf5;">
     <p style="margin:0 0 8px;"><strong>لینک دانلود امن (TTL: {{ ttl_hours }} ساعت)</strong></p>
-    <input id="secure-link-input" type="text" readonly dir="ltr" value="{{ generated_link }}"
-           style="width:100%;padding:8px;font-family:monospace;font-size:.85rem;">
-    <button class="btn btn-sm" type="button" style="margin-top:8px;"
-            onclick="navigator.clipboard.writeText(document.getElementById('secure-link-input').value)">کپی لینک</button>
+    <div class="dl-link-cell">
+        <input id="secure-link-input" type="text" readonly dir="ltr" value="{{ generated_link }}"
+               style="font-family:monospace;">
+        <button class="btn btn-sm" type="button"
+                onclick="navigator.clipboard.writeText(document.getElementById('secure-link-input').value)">کپی لینک</button>
+    </div>
 </div>
 {% endif %}
 
@@ -63,7 +65,7 @@
         </div>
         <div class="form-field full">
             <label>دسته‌بندی‌ها</label>
-            <div style="display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:6px;">
+            <div class="category-checks">
                 {% for cat in categories %}
                 <label class="form-check" style="margin:0;">
                     <input type="checkbox" name="category_ids" value="{{ cat.id }}"

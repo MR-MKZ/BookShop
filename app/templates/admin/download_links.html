@@ -25,16 +25,17 @@
         <tr>
             <td>{{ row.book_title }}</td>
             <td class="date-fa">{{ row.created_fa }}</td>
-            <td>{{ row.remaining }}</td>
+            <td class="remaining-fa">{{ row.remaining }}</td>
             <td dir="ltr">{{ row.link.download_count }}</td>
             <td>{{ row.link.note or '—' }}</td>
             <td>
                 {% if row.url %}
-                <input type="text" readonly dir="ltr" value="{{ row.url }}"
-                       id="link-{{ row.link.id }}"
-                       style="width:180px;font-size:.75rem;padding:4px;">
-                <button class="btn btn-sm btn-secondary" type="button"
-                        onclick="navigator.clipboard.writeText(document.getElementById('link-{{ row.link.id }}').value)">کپی</button>
+                <div class="dl-link-cell">
+                    <input type="text" readonly dir="ltr" value="{{ row.url }}"
+                           id="link-{{ row.link.id }}">
+                    <button class="btn btn-sm btn-secondary" type="button"
+                            onclick="navigator.clipboard.writeText(document.getElementById('link-{{ row.link.id }}').value)">کپی</button>
+                </div>
                 {% else %}—{% endif %}
             </td>
             <td>

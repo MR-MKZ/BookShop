@@ -220,12 +220,59 @@
         .badge-no { background: #fecaca; color: #991b1b; }
         .badge-pending { background: #fef08a; color: #854d0e; }
         .badge-muted { background: #e2e8f0; color: #475569; }
+        .card .admin-form {
+            max-width: 100%;
+            border: 0;
+            box-shadow: none;
+            padding: 0;
+            background: transparent;
+        }
+        .card .admin-form .form-actions {
+            border-top: 0;
+            padding-top: 0;
+            margin-top: 12px;
+        }
+        .admin-form .category-edit-grid {
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        }
+        .dl-link-cell {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+            min-width: 0;
+        }
+        .dl-link-cell input {
+            flex: 1 1 160px;
+            min-width: 0;
+            width: auto;
+            font-size: .75rem;
+            padding: 6px 8px;
+            min-height: 32px;
+        }
+        .category-checks {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 16px;
+            margin-top: 6px;
+        }
         .pager { margin-top: 16px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .page-select-label { display: inline-flex; align-items: center; gap: 8px; font-size: .9rem; color: #334155; }
         .page-select { min-width: 72px; padding: 6px 10px; border: 1px solid #cbd5e1; border-radius: 6px; direction: ltr; }
         form.inline { display: inline; }
         code { background: #e2e8f0; padding: 2px 6px; border-radius: 4px; font-size: .85rem; }
-        td.date-fa { direction: ltr; text-align: left; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        /* LTR digits, but keep cell under RTL column headers (right side) */
+        td.date-fa,
+        td.remaining-fa {
+            direction: rtl;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        td.date-fa {
+            direction: ltr;
+            unicode-bidi: isolate;
+        }
 
         /* Chart range + cards */
         .chart-section { margin-top: 28px; }
@@ -460,10 +507,34 @@
                 white-space: normal;
                 text-align: center;
             }
+            .card { max-width: 100% !important; }
+            .admin-form .category-edit-grid {
+                grid-template-columns: 1fr !important;
+            }
+            .dl-link-cell {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .dl-link-cell .btn { width: 100%; }
+            .category-checks {
+                gap: 8px 12px;
+            }
+            .category-checks .form-check {
+                flex: 1 1 calc(50% - 12px);
+                min-width: 0;
+            }
+            .form-hint code {
+                display: inline-block;
+                margin: 2px 0;
+                word-break: break-all;
+            }
         }
         @media (max-width: 420px) {
             .cards { grid-template-columns: 1fr 1fr; }
             .btn-row .btn { flex: 1 1 100%; }
+            .category-checks .form-check {
+                flex: 1 1 100%;
+            }
         }
     </style>
     {% block head %}{% endblock %}

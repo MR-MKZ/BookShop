@@ -17,7 +17,7 @@
     <form method="post" action="/admin/settings/home-category-limit" class="filters" style="margin:0;">
         <label>
             تعداد
-            <input type="number" name="limit" min="1" max="48" value="{{ home_limit }}" required style="width:100px;">
+            <input type="number" name="limit" min="1" max="48" value="{{ home_limit }}" required style="width:100px;max-width:100%;">
         </label>
         <button class="btn" type="submit">ذخیره</button>
     </form>
@@ -79,7 +79,7 @@
             <td colspan="6">
                 <form method="post" action="/admin/categories/{{ cat.id }}/edit" enctype="multipart/form-data"
                       class="admin-form" style="margin:0;">
-                    <div class="form-grid" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));">
+                    <div class="form-grid category-edit-grid">
                         <div class="form-field">
                             <label>نام</label>
                             <input name="name" value="{{ cat.name }}" required>

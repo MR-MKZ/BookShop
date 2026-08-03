@@ -34,7 +34,7 @@
         </p>
         <ul class="list-unstyled">
             {% for item in downloads %}
-            <li class="mb-3 p-3 border rounded">
+            <li class="mb-3 p-3 border rounded order-item-block">
                 <strong>{{ item.title or item.book.display_title }}</strong>
                 <div class="mt-2">
                     <a class="btn" href="{{ item.url }}">دانلود فایل</a>
@@ -48,7 +48,7 @@
         <h3 class="mb-3 mt-4">آماده‌سازی فایل</h3>
         <ul class="list-unstyled">
             {% for item in pending_files %}
-            <li class="mb-3 p-3 border rounded">
+            <li class="mb-3 p-3 border rounded order-item-block">
                 <strong>{{ item.title }}</strong>
                 <p class="mt-2 mb-0" style="white-space:pre-wrap;">{{ item.message }}</p>
             </li>
@@ -75,10 +75,10 @@
         <div class="alert alert-info">وضعیت سفارش: {{ order.status.value }}</div>
         {% endif %}
 
-        <p class="mt-4">
+        <div class="order-thanks-actions">
             <a href="/search" class="btn">ادامه خرید</a>
             <a href="/orders/recover" class="btn checkout_btn">بازیابی سفارش دیگر</a>
-        </p>
+        </div>
     </div>
 </section>
 {% endblock %}

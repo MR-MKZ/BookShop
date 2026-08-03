@@ -2362,14 +2362,20 @@ def _remaining_label(expires_at: datetime | None) -> str:
         return "—"
     now = datetime.now(timezone.utc)
     exp = expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=timezone.utc)
-    delta = exp - now
-    if delta.total_seconds() <= 0:
+    total_sec = int((exp - now).total_seconds())
+    if total_sec <= 0:
         return "منقضی"
-    hours, rem = divmod(int(delta.total_seconds()), 3600)
+    days, rem = divmod(total_sec, 86400)
+    hours, rem = divmod(rem, 3600)
     minutes = rem // 60
+    parts: list[str] = []
+    if days:
+        parts.append(f"{days} روز")
     if hours:
-        return f"{hours}س {minutes}د"
-    return f"{minutes} دقیقه"
+        parts.append(f"{hours} ساعت")
+    if minutes or not parts:
+        parts.append(f"{minutes} دقیقه")
+    return " و ".join(parts)
 
 
 @router.get("/download-links", response_class=HTMLResponse)

@@ -31,11 +31,11 @@
     </div>
 </div>
 
-<div class="categories-slider section-padding">
+<div class="categories-listing">
     <div class="container">
         <div class="row">
             {% for cat in categories %}
-            <div class="col-xxl-3 col-xl-3 col-lg-4 col-md-6 col-sm-6 mb-4">
+            <div class="col-6 col-md-4 col-lg-3 mb-3 mb-md-4">
                 <div class="category-item">
                     <a href="{{ cat.path }}" class="category-img">
                         <img src="{{ cat.image_url or '/static/img/book/default.png' }}"

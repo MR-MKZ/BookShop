@@ -78,11 +78,11 @@
 </div>
 
 {% if home_categories %}
-<div class="categories-slider" style="padding-top: 70px;">
+<div class="categories-slider home-categories-band">
     <div class="container">
         <div class="row justify-content-right">
-            <div class="col-xl-7 col-lg-8">
-                <div class="section-tittle section-tittle-row mb-55">
+            <div class="col-12">
+                <div class="section-tittle section-tittle-row">
                     <h2>دسته‌بندی‌ها</h2>
                     <a href="/categories" class="section-see-all">
                         همه دسته‌ها
@@ -113,11 +113,11 @@
 {% endif %}
 
 {% for section in home_category_sections|default([]) %}
-<div class="best-selling section-bg" style="padding-top: 50px; padding-bottom: 30px;">
+<div class="best-selling section-bg home-category-shelf">
     <div class="container">
         <div class="row">
             <div class="col-12">
-                <div class="section-tittle section-tittle-row mb-55">
+                <div class="section-tittle section-tittle-row">
                     <h2>{{ section.category.name }}</h2>
                     <a href="{{ section.category.path }}" class="section-see-all">
                         مشاهده همه
@@ -137,11 +137,11 @@
 </div>
 {% endfor %}
 
-<div class="best-selling section-bg" style="padding-top: 70px; padding-bottom: 70px;">
+<div class="best-selling section-bg home-latest-shelf">
     <div class="container">
         <div class="row">
             <div class="col-12">
-                <div class="section-tittle section-tittle-row mb-55">
+                <div class="section-tittle section-tittle-row">
                     <h2>جدیدترین کتاب‌ها</h2>
                     <a href="/search" class="section-see-all">
                         مشاهده همه کتاب‌ها
