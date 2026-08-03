@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import os
+import re
 import secrets
 import time
 from datetime import datetime, timedelta, timezone
-from urllib.parse import quote
+from urllib.parse import quote, unquote, urlparse
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +21,23 @@ DOWNLOAD_SIGNER_MAX_AGE = 60 * 60 * 24 * 31
 EXTERNAL_PROXY_FILENAME = "external.bin"
 
 
+def extension_from_url(url: str | None) -> str | None:
+    """Best-effort file extension from an external download URL path."""
+    if not url:
+        return None
+    try:
+        path = unquote(urlparse(url).path or "")
+    except Exception:
+        return None
+    _, ext = os.path.splitext(path)
+    ext = (ext or "").lstrip(".").lower()
+    if not ext or len(ext) > 12:
+        return None
+    if not re.fullmatch(r"[a-z0-9]+", ext):
+        return None
+    return ext
+
+
 def proxy_filename(book: Book) -> str:
     """Filename used in the public proxy path (not the external host URL)."""
     if book.file_filename:
@@ -26,6 +45,21 @@ def proxy_filename(book: Book) -> str:
     if book.external_file_url and str(book.external_file_url).strip():
         return EXTERNAL_PROXY_FILENAME
     return book.pdf_filename
+
+
+def client_download_name(book: Book) -> str:
+    """Human download name using real format (from upload or external URL)."""
+    ext = None
+    if book.file_filename:
+        _, file_ext = os.path.splitext(book.file_filename)
+        ext = (file_ext or "").lstrip(".").lower() or None
+    if not ext and book.external_file_url:
+        ext = extension_from_url(book.external_file_url)
+    if not ext:
+        ext = (book.file_format or "bin").lstrip(".").lower() or "bin"
+    return Book.build_download_filename(
+        book.id, book.title_en, book.title, ext
+    )
 
 
 def make_download_token(
@@ -41,7 +75,7 @@ def make_download_token(
     payload = {
         "folder": folder,
         "filename": filename,
-        "download_name": book.download_filename,
+        "download_name": client_download_name(book),
         "user_id": user_id,
         "book_id": book.id,
         "order_id": order_id,

@@ -1,6 +1,8 @@
 import hashlib
 import logging
 import os
+import re
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
@@ -28,6 +30,7 @@ EXTERNAL_FETCH_HEADERS = {
         "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
     ),
     "Accept": "*/*",
+    "Accept-Encoding": "identity",
 }
 
 # Use SECRET_KEY for signing and validating links
@@ -47,12 +50,54 @@ def _cover_etag(folder_name: str, filename: str) -> str:
 
 
 def _attachment_headers(
-    storage_filename: str, download_name: str | None, book_id: int | None
+    storage_filename: str,
+    download_name: str | None,
+    book_id: int | None,
+    *,
+    content_length: int | None = None,
+    accept_ranges: bool = True,
+    content_range: str | None = None,
 ) -> dict[str, str]:
     name = download_name or storage_filename
-    return {
+    headers = {
         "Content-Disposition": Book.content_disposition(name, book_id),
+        "Cache-Control": "private, no-store",
     }
+    if accept_ranges:
+        headers["Accept-Ranges"] = "bytes"
+    if content_length is not None and content_length >= 0:
+        headers["Content-Length"] = str(int(content_length))
+    if content_range:
+        headers["Content-Range"] = content_range
+    return headers
+
+
+def _parse_range_header(range_header: str | None, size: int) -> tuple[int, int] | None:
+    """Return inclusive (start, end) for a single bytes range, or None for full file."""
+    if not range_header or size <= 0:
+        return None
+    m = re.match(r"bytes=(\d*)-(\d*)", range_header.strip())
+    if not m:
+        return None
+    start_s, end_s = m.group(1), m.group(2)
+    if start_s == "" and end_s == "":
+        return None
+    if start_s == "":
+        # suffix: last N bytes
+        length = int(end_s)
+        if length <= 0:
+            return None
+        start = max(0, size - length)
+        end = size - 1
+    else:
+        start = int(start_s)
+        end = int(end_s) if end_s else size - 1
+    if start >= size or start < 0:
+        return None
+    end = min(end, size - 1)
+    if end < start:
+        return None
+    return start, end
 
 
 def is_safe_path(path_part: str) -> bool:
@@ -153,12 +198,89 @@ BOOK_CONTENT_TYPES = {
     ".rar": "application/vnd.rar",
     ".zip": "application/zip",
     ".7z": "application/x-7z-compressed",
+    ".bin": "application/octet-stream",
 }
 
 
 def book_media_type(filename: str) -> str:
     _, ext = os.path.splitext(filename.lower())
     return BOOK_CONTENT_TYPES.get(ext, "application/octet-stream")
+
+
+async def media_file_size(folder_name: str, filename: str) -> int | None:
+    """Return byte size for local/FTP stored file, or None if unknown."""
+    if not is_safe_path(folder_name) or not is_safe_path(filename):
+        return None
+    if not settings.FTP_ENABLED:
+        full_path = os.path.join(settings.MEDIA_ROOT, folder_name, filename)
+        try:
+            return os.path.getsize(full_path)
+        except OSError:
+            return None
+    try:
+        from app.services.ftp_client import ftp_client
+
+        async with ftp_client() as client:
+            st = await client.stat(f"{folder_name}/{filename}")
+            size = getattr(st, "size", None)
+            return int(size) if size is not None else None
+    except Exception:
+        return None
+
+
+async def stream_media_range(
+    folder_name: str, filename: str, start: int = 0, end: int | None = None
+):
+    """Stream a byte range from local disk or FTP (inclusive end)."""
+    if not is_safe_path(folder_name) or not is_safe_path(filename):
+        return
+    length = None if end is None else (end - start + 1)
+
+    if not settings.FTP_ENABLED:
+        full_path = os.path.join(settings.MEDIA_ROOT, folder_name, filename)
+        async with aiofiles.open(full_path, "rb") as f:
+            await f.seek(start)
+            remaining = length
+            while True:
+                chunk_size = 8192
+                if remaining is not None:
+                    if remaining <= 0:
+                        break
+                    chunk_size = min(chunk_size, remaining)
+                chunk = await f.read(chunk_size)
+                if not chunk:
+                    break
+                if remaining is not None:
+                    remaining -= len(chunk)
+                yield chunk
+        return
+
+    # FTP: download stream then skip (aioftp has no reliable seek on all servers)
+    from app.services.ftp_client import ftp_client
+
+    skipped = 0
+    remaining = length
+    try:
+        async with ftp_client() as client:
+            async with client.download_stream(f"{folder_name}/{filename}") as stream:
+                async for block in stream.iter_by_block(8192):
+                    if skipped < start:
+                        need = start - skipped
+                        if len(block) <= need:
+                            skipped += len(block)
+                            continue
+                        block = block[need:]
+                        skipped = start
+                    if remaining is not None:
+                        if remaining <= 0:
+                            break
+                        if len(block) > remaining:
+                            block = block[:remaining]
+                        remaining -= len(block)
+                    if block:
+                        yield block
+    except Exception as e:
+        logger.error("FTP ranged stream error: %s", e)
 
 
 @router.get("/cover/{folder_name}/{filename}")
@@ -256,31 +378,65 @@ async def proxy_hero(filename: str, request: Request):
     )
 
 
-async def open_external_stream(url: str):
+@dataclass
+class ExternalOpenResult:
+    status_code: int
+    media_type: str
+    content_length: int | None
+    content_range: str | None
+    accept_ranges: bool
+    stream: object  # async generator
+
+
+async def open_external_download(
+    url: str, *, range_header: str | None = None
+) -> ExternalOpenResult | None:
     """
-    Open upstream GET and return an async generator, or None on failure.
-    Never redirects the client to the external URL.
+    Open upstream GET (optionally with Range). Never redirects the browser
+    to the external URL. Rejects HTML interstitial pages.
     """
     timeout = aiohttp.ClientTimeout(total=None, sock_connect=30, sock_read=180)
     session = aiohttp.ClientSession(timeout=timeout)
+    headers = dict(EXTERNAL_FETCH_HEADERS)
+    if range_header:
+        headers["Range"] = range_header
     try:
-        resp = await session.get(
-            url, allow_redirects=True, headers=EXTERNAL_FETCH_HEADERS
-        )
+        resp = await session.get(url, allow_redirects=True, headers=headers)
     except Exception as e:
         await session.close()
         logger.error("External download open failed: %s", type(e).__name__)
         return None
 
-    if resp.status >= 400:
+    if resp.status >= 400 and resp.status != 416:
         logger.error("External download upstream status %s", resp.status)
         resp.release()
         await session.close()
         return None
 
+    ctype = (resp.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+    # Download hosts sometimes return an HTML landing/ads page instead of the file
+    if ctype.startswith("text/html") or ctype == "application/xhtml+xml":
+        logger.error("External URL returned HTML interstitial, not a file")
+        resp.release()
+        await session.close()
+        return None
+
+    cl_raw = resp.headers.get("Content-Length")
+    content_length = None
+    if cl_raw and str(cl_raw).isdigit():
+        content_length = int(cl_raw)
+    content_range = resp.headers.get("Content-Range")
+    accept_ranges = True
+
+    media_type = ctype or "application/octet-stream"
+    if media_type in {"application/force-download", "binary/octet-stream"}:
+        media_type = "application/octet-stream"
+
+    status_code = resp.status if resp.status in (200, 206) else 200
+
     async def _gen():
         try:
-            async for chunk in resp.content.iter_chunked(8192):
+            async for chunk in resp.content.iter_chunked(64 * 1024):
                 if chunk:
                     yield chunk
         except Exception as e:
@@ -289,7 +445,14 @@ async def open_external_stream(url: str):
             resp.release()
             await session.close()
 
-    return _gen()
+    return ExternalOpenResult(
+        status_code=status_code,
+        media_type=media_type,
+        content_length=content_length,
+        content_range=content_range,
+        accept_ranges=accept_ranges,
+        stream=_gen(),
+    )
 
 
 def _is_http_url(url: str) -> bool:
@@ -389,6 +552,8 @@ async def proxy_book(
     from app.services.downloads import (
         DOWNLOAD_SIGNER_MAX_AGE,
         EXTERNAL_PROXY_FILENAME,
+        client_download_name,
+        extension_from_url,
         token_expired,
     )
 
@@ -490,43 +655,111 @@ async def proxy_book(
         icon="file",
     )
 
+    range_header = request.headers.get("range") or request.headers.get("Range")
+    # Count only first/full downloads, not mid-file resume probes
+    count_download = not (
+        range_header and not range_header.strip().lower().startswith("bytes=0-")
+    )
+
+    async def _serve_stored(local_name: str, out_name: str, bid: int | None):
+        size = await media_file_size(folder_name, local_name)
+        byte_range = _parse_range_header(range_header, size) if size else None
+        if range_header and size and byte_range is None:
+            return Response(
+                status_code=416,
+                headers={
+                    "Content-Range": f"bytes */{size}",
+                    "Accept-Ranges": "bytes",
+                },
+            )
+        if count_download:
+            await _mark_link_download(db, managed_link)
+        if byte_range is not None:
+            start, end = byte_range
+            length = end - start + 1
+            return StreamingResponse(
+                stream_media_range(folder_name, local_name, start, end),
+                status_code=206,
+                media_type=book_media_type(out_name),
+                headers=_attachment_headers(
+                    local_name,
+                    out_name,
+                    bid,
+                    content_length=length,
+                    content_range=f"bytes {start}-{end}/{size}",
+                ),
+            )
+        return StreamingResponse(
+            stream_media_range(folder_name, local_name, 0, (size - 1) if size else None)
+            if size
+            else stream_media(folder_name, local_name),
+            media_type=book_media_type(out_name),
+            headers=_attachment_headers(
+                local_name,
+                out_name,
+                bid,
+                content_length=size,
+            ),
+        )
+
     # Prefer local/FTP file when present
     if book and book.file_filename:
         local_name = book.pdf_filename
         if await check_file_exists(folder_name, local_name):
-            await _mark_link_download(db, managed_link)
-            return StreamingResponse(
-                stream_media(folder_name, local_name),
-                media_type=book_media_type(local_name),
-                headers=_attachment_headers(
-                    local_name, download_name or book.download_filename, book.id
-                ),
-            )
+            out_name = download_name or client_download_name(book)
+            return await _serve_stored(local_name, out_name, book.id)
 
     if filename != EXTERNAL_PROXY_FILENAME and await check_file_exists(
         folder_name, filename
     ):
-        await _mark_link_download(db, managed_link)
-        return StreamingResponse(
-            stream_media(folder_name, filename),
-            media_type=book_media_type(filename),
-            headers=_attachment_headers(filename, download_name, book_id),
-        )
+        out_name = download_name or filename
+        return await _serve_stored(filename, out_name, book_id)
 
     # External URL: load only from DB — never from token / redirects / HTML
     external = (book.external_file_url or "").strip() if book else ""
     if external and _is_http_url(external):
-        stream = await open_external_stream(external)
-        if stream is None:
+        opened = await open_external_download(external, range_header=range_header)
+        if opened is None:
             return not_found
-        out_name = download_name or (
-            book.download_filename if book else filename
+
+        # Prefer real extension from remote URL over stale token ".pdf"
+        ext = extension_from_url(external)
+        if book:
+            out_name = client_download_name(book)
+            # Keep DB format in sync for next token generation
+            if ext and (book.file_format or "").lower() != ext:
+                book.file_format = ext
+                await db.commit()
+        else:
+            out_name = download_name or filename
+            if ext and out_name.lower().endswith(".pdf") and ext != "pdf":
+                out_name = out_name[: -4] + f".{ext}"
+
+        # Never claim PDF when remote file is not PDF
+        media = opened.media_type
+        if ext and ext != "pdf" and media == "application/pdf":
+            media = book_media_type(f"x.{ext}")
+        elif ext:
+            guessed = book_media_type(f"x.{ext}")
+            if media in {"", "application/octet-stream"} or not media:
+                media = guessed
+
+        if count_download:
+            await _mark_link_download(db, managed_link)
+
+        headers = _attachment_headers(
+            out_name,
+            out_name,
+            book.id if book else book_id,
+            content_length=opened.content_length,
+            accept_ranges=opened.accept_ranges,
+            content_range=opened.content_range,
         )
-        await _mark_link_download(db, managed_link)
         return StreamingResponse(
-            stream,
-            media_type=book_media_type(out_name),
-            headers=_attachment_headers(out_name, out_name, book_id),
+            opened.stream,
+            status_code=opened.status_code,
+            media_type=media or book_media_type(out_name),
+            headers=headers,
         )
 
     return not_found

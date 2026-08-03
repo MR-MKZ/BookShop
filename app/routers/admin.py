@@ -110,6 +110,7 @@ ALLOWED_BOOK_EXTS = {
     "rar",
     "zip",
     "7z",
+    "bin",
 }
 
 ALLOWED_COVER_EXTS = {"jpg", "jpeg", "png", "webp"}
@@ -1108,6 +1109,15 @@ async def admin_set_external_url(
             status_code=status.HTTP_303_SEE_OTHER,
         )
     book.external_file_url = url or None
+    if url:
+        from app.services.downloads import extension_from_url
+
+        ext = extension_from_url(url)
+        if ext:
+            book.file_format = ext
+        elif not book.file_filename:
+            # Unknown remote type — do not pretend it is PDF
+            book.file_format = "bin"
     book.sync_has_pdf()
     await db.commit()
     return RedirectResponse(
