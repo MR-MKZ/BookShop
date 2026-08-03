@@ -1,25 +1,49 @@
 {% extends "admin/base.html" %}
 {% block title %}ویرایش کتاب{% endblock %}
 {% block content %}
-<h1>ویرایش کتاب #{{ book.id }}</h1>
+<div class="page-header">
+    <div>
+        <nav class="crumbs" aria-label="مسیر">
+            <a href="/admin/books">کتاب‌ها</a>
+            <span class="sep">/</span>
+            <span>ویرایش #{{ book.id }}</span>
+        </nav>
+        <h1>{{ book.display_title }}</h1>
+        <p class="page-sub">شناسه {{ book.id }}{% if book.folder_name %} — پوشه <span dir="ltr">{{ book.folder_name }}</span>{% endif %}</p>
+    </div>
+    <div class="page-actions btn-row">
+        <a class="btn btn-secondary" href="{{ book.path }}" target="_blank" rel="noopener">مشاهده در سایت</a>
+        <a class="btn btn-secondary" href="/admin/books">بازگشت</a>
+    </div>
+</div>
+
 {% if message == 'link_created' %}
-<div class="msg">لینک امن ساخته شد. می‌توانید آن را کپی و برای مشتری بفرستید.</div>
+<div class="msg msg-ok">لینک امن ساخته شد. می‌توانید آن را کپی و برای مشتری بفرستید.</div>
 {% elif message == 'external_saved' %}
-<div class="msg">لینک مستقیم فایل ذخیره شد (برای مشتری نمایش داده نمی‌شود).</div>
+<div class="msg msg-ok">لینک مستقیم فایل ذخیره شد (برای مشتری نمایش داده نمی‌شود).</div>
 {% elif message == 'external_cleared' %}
-<div class="msg">لینک خارجی پاک شد.</div>
+<div class="msg msg-ok">لینک خارجی پاک شد.</div>
+{% elif message == 'uploaded' %}
+<div class="msg msg-ok">فایل آپلود شد.</div>
+{% elif message == 'file_deleted' %}
+<div class="msg msg-ok">فایل حذف شد.</div>
+{% elif message == 'saved' %}
+<div class="msg msg-ok">اطلاعات کتاب ذخیره شد.</div>
+{% elif message == 'created' %}
+<div class="msg msg-ok">کتاب ایجاد شد. در صورت نیاز فایل و دسته را تکمیل کنید.</div>
 {% elif message == 'no_file_for_link' %}
-<div class="msg" style="background:#fecaca;color:#991b1b;">برای ساخت لینک امن ابتدا فایل آپلود کنید یا لینک خارجی ثبت کنید.</div>
+<div class="msg msg-err">برای ساخت لینک امن ابتدا فایل آپلود کنید یا لینک خارجی ثبت کنید.</div>
 {% elif message == 'bad_external_url' %}
-<div class="msg" style="background:#fecaca;color:#991b1b;">آدرس باید با http:// یا https:// شروع شود.</div>
+<div class="msg msg-err">آدرس باید با http:// یا https:// شروع شود.</div>
 {% elif message %}
-<div class="msg">عملیات با موفقیت انجام شد ({{ message }})</div>
+<div class="msg msg-ok">عملیات انجام شد.</div>
 {% endif %}
-{% if error %}<div class="msg" style="background:#fecaca;color:#991b1b;">{{ error }}</div>{% endif %}
+{% if error %}<div class="msg msg-err">{{ error }}</div>{% endif %}
 
 {% if generated_link %}
-<div class="card" style="max-width:720px;margin-bottom:16px;background:#ecfdf5;">
-    <p style="margin:0 0 8px;"><strong>لینک دانلود امن (TTL: {{ ttl_hours }} ساعت)</strong></p>
+<div class="admin-section" style="background:#ecfdf5;border-color:#bbf7d0;">
+    <h2>لینک دانلود امن آماده است</h2>
+    <p class="section-lead">اعتبار: {{ ttl_hours }} ساعت — این لینک را برای مشتری بفرستید.</p>
     <div class="dl-link-cell">
         <input id="secure-link-input" type="text" readonly dir="ltr" value="{{ generated_link }}"
                style="font-family:monospace;">
@@ -29,85 +53,96 @@
 </div>
 {% endif %}
 
-<form class="admin-form" method="post" action="/admin/books/{{ book.id }}">
-    <div class="form-grid">
-        <div class="form-field full">
-            <label for="title">عنوان فارسی</label>
-            <input id="title" name="title" value="{{ book.title or '' }}" required>
-        </div>
-        <div class="form-field full">
-            <label for="title_en">عنوان انگلیسی</label>
-            <input id="title_en" name="title_en" value="{{ book.title_en or '' }}" dir="ltr">
-        </div>
-        <div class="form-field">
-            <label for="author">نویسنده</label>
-            <input id="author" name="author" value="{{ book.author or '' }}">
-        </div>
-        <div class="form-field">
-            <label for="publisher">ناشر</label>
-            <input id="publisher" name="publisher" value="{{ book.publisher or '' }}">
-        </div>
-        <div class="form-field full">
-            <label for="isbn">ISBN</label>
-            <input id="isbn" name="isbn" value="{{ book.isbn or '' }}" dir="ltr">
-        </div>
-        <div class="form-field">
-            <label for="price">قیمت فروش (تومان)</label>
-            <input id="price" name="price" value="{{ book.price or 0 }}" dir="ltr">
-        </div>
-        <div class="form-field">
-            <label for="original_price">قیمت اصلی خط‌خورده</label>
-            <input id="original_price" name="original_price" value="{{ book.original_price or '' }}" dir="ltr">
-        </div>
-        <div class="form-field full">
-            <label for="description">توضیحات</label>
-            <textarea id="description" name="description" rows="8">{{ book.description or '' }}</textarea>
-        </div>
-        <div class="form-field full">
-            <label>دسته‌بندی‌ها</label>
-            <div class="category-checks">
-                {% for cat in categories %}
-                <label class="form-check" style="margin:0;">
-                    <input type="checkbox" name="category_ids" value="{{ cat.id }}"
-                           {% if cat.id in selected_category_ids %}checked{% endif %}>
-                    {{ cat.name }}
+<nav class="jump-nav" aria-label="بخش‌های صفحه">
+    <a href="#book-info">اطلاعات</a>
+    <a href="#file-source">منبع فایل</a>
+    <a href="#secure-link">لینک امن</a>
+    <a href="#danger-zone">حذف</a>
+</nav>
+
+<section class="admin-section" id="book-info">
+    <h2>اطلاعات کتاب</h2>
+    <p class="section-lead">عنوان، قیمت، دسته و وضعیت نمایش در فروشگاه</p>
+    <form class="admin-form" method="post" action="/admin/books/{{ book.id }}">
+        <div class="form-grid">
+            <div class="form-field full">
+                <label for="title">عنوان فارسی</label>
+                <input id="title" name="title" value="{{ book.title or '' }}" required>
+            </div>
+            <div class="form-field full">
+                <label for="title_en">عنوان انگلیسی</label>
+                <input id="title_en" name="title_en" value="{{ book.title_en or '' }}" dir="ltr">
+                <p class="form-hint">برای آدرس SEO و نمایش کارت‌ها استفاده می‌شود.</p>
+            </div>
+            <div class="form-field">
+                <label for="author">نویسنده</label>
+                <input id="author" name="author" value="{{ book.author or '' }}">
+            </div>
+            <div class="form-field">
+                <label for="publisher">ناشر</label>
+                <input id="publisher" name="publisher" value="{{ book.publisher or '' }}">
+            </div>
+            <div class="form-field full">
+                <label for="isbn">ISBN</label>
+                <input id="isbn" name="isbn" value="{{ book.isbn or '' }}" dir="ltr">
+            </div>
+            <div class="form-field">
+                <label for="price">قیمت فروش (تومان)</label>
+                <input id="price" name="price" value="{{ book.price or 0 }}" dir="ltr">
+            </div>
+            <div class="form-field">
+                <label for="original_price">قیمت اصلی خط‌خورده</label>
+                <input id="original_price" name="original_price" value="{{ book.original_price or '' }}" dir="ltr">
+            </div>
+            <div class="form-field full">
+                <label for="description">توضیحات</label>
+                <textarea id="description" name="description" rows="8">{{ book.description or '' }}</textarea>
+            </div>
+            <div class="form-field full">
+                <label>دسته‌بندی‌ها</label>
+                <div class="category-checks">
+                    {% for cat in categories %}
+                    <label class="form-check" style="margin:0;">
+                        <input type="checkbox" name="category_ids" value="{{ cat.id }}"
+                               {% if cat.id in selected_category_ids %}checked{% endif %}>
+                        {{ cat.name }}
+                    </label>
+                    {% else %}
+                    <span style="color:#64748b;font-size:.85rem;">هنوز دسته‌ای نیست —
+                        <a href="/admin/categories#cat-new">بسازید</a>.</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="form-field full">
+                <label class="form-check">
+                    <input type="checkbox" name="is_active" {% if book.is_active %}checked{% endif %}>
+                    فعال در فروشگاه
                 </label>
-                {% else %}
-                <span style="color:#64748b;font-size:.85rem;">هنوز دسته‌ای تعریف نشده — از منوی دسته‌بندی‌ها بسازید.</span>
-                {% endfor %}
             </div>
         </div>
-        <div class="form-field full">
-            <label class="form-check">
-                <input type="checkbox" name="is_active" {% if book.is_active %}checked{% endif %}>
-                فعال
-            </label>
+        <div class="form-actions">
+            <button class="btn" type="submit">ذخیره اطلاعات</button>
         </div>
-    </div>
-    <div class="form-actions">
-        <button class="btn" type="submit">ذخیره</button>
-        <a class="btn btn-secondary" href="/admin/books">بازگشت</a>
-    </div>
-</form>
+    </form>
+</section>
 
-<hr>
-<h2>منبع فایل</h2>
-<p style="color:#64748b;font-size:.85rem;">
-    وضعیت:
-    {% if book.file_filename and has_external %}
-        <span class="badge badge-ok">آپلود + لینک خارجی</span>
-    {% elif book.file_filename %}
-        <span class="badge badge-ok">آپلود روی سرور</span>
-    {% elif has_external %}
-        <span class="badge badge-ok">لینک خارجی</span>
-    {% else %}
-        <span class="badge badge-no">فایل آماده نیست</span>
-    {% endif %}
-    — مشتری هرگز لینک مستقیم خارجی را نمی‌بیند.
-</p>
+<section class="admin-section" id="file-source">
+    <h2>منبع فایل</h2>
+    <p class="section-lead">
+        وضعیت:
+        {% if book.file_filename and has_external %}
+            <span class="badge badge-ok">آپلود + لینک خارجی</span>
+        {% elif book.file_filename %}
+            <span class="badge badge-ok">آپلود روی سرور</span>
+        {% elif has_external %}
+            <span class="badge badge-ok">لینک خارجی</span>
+        {% else %}
+            <span class="badge badge-no">فایل آماده نیست</span>
+        {% endif %}
+        — مشتری هرگز لینک مستقیم خارجی را نمی‌بیند.
+    </p>
 
-<div class="card" style="max-width:640px;margin-bottom:16px;">
-    <h3 style="font-size:1rem;margin:0 0 12px;">فایل آپلود‌شده</h3>
+    <h3 style="font-size:.95rem;margin:0 0 10px;">فایل آپلود‌شده</h3>
     {% if book.file_filename %}
         <p style="margin:0 0 12px;overflow-wrap:anywhere;word-break:break-word;">
             فایل فعلی: <strong dir="ltr">{{ book.pdf_filename }}</strong>
@@ -119,32 +154,32 @@
                 <span class="badge badge-no">در دیتابیس هست ولی فایل یافت نشد</span>
             {% endif %}
         </p>
-        <div class="btn-row btn-row-sm">
+        <div class="btn-row btn-row-sm" style="margin-bottom:14px;">
             <a class="btn btn-sm" href="/admin/books/{{ book.id }}/file">دانلود</a>
             <form method="post" action="/admin/books/{{ book.id }}/file/delete" onsubmit="return confirm('حذف فایل آپلود‌شده؟');">
                 <button class="btn btn-sm btn-danger" type="submit">حذف فایل</button>
             </form>
         </div>
     {% else %}
-        <p><span class="badge badge-no">فایلی آپلود نشده</span></p>
+        <p style="margin:0 0 12px;"><span class="badge badge-no">فایلی آپلود نشده</span></p>
     {% endif %}
-</div>
 
-<form class="admin-form" action="/admin/books/{{ book.id }}/upload" method="post" enctype="multipart/form-data">
-    <div class="form-grid">
-        <div class="form-field full">
-            <label for="book_file">{% if book.file_filename %}جایگزینی فایل{% else %}آپلود فایل{% endif %}</label>
-            <input id="book_file" type="file" name="file" accept=".{{ allowed_exts|join(',.') }}" required>
-            <p class="form-hint">فرمت‌های مجاز: {{ allowed_exts|join(', ') }}</p>
+    <form class="admin-form" action="/admin/books/{{ book.id }}/upload" method="post" enctype="multipart/form-data">
+        <div class="form-grid">
+            <div class="form-field full">
+                <label for="book_file">{% if book.file_filename %}جایگزینی فایل{% else %}آپلود فایل{% endif %}</label>
+                <input id="book_file" type="file" name="file" accept=".{{ allowed_exts|join(',.') }}" required>
+                <p class="form-hint">فرمت‌های مجاز: {{ allowed_exts|join(', ') }}</p>
+            </div>
         </div>
-    </div>
-    <div class="form-actions">
-        <button class="btn" type="submit">{% if book.file_filename %}جایگزین کن{% else %}آپلود{% endif %}</button>
-    </div>
-</form>
+        <div class="form-actions">
+            <button class="btn" type="submit">{% if book.file_filename %}جایگزین کن{% else %}آپلود{% endif %}</button>
+        </div>
+    </form>
 
-<div class="card" style="max-width:640px;margin:24px 0;">
-    <h3 style="font-size:1rem;margin:0 0 12px;">لینک مستقیم خارجی (هاست دانلود)</h3>
+    <hr style="border:0;border-top:1px solid #e2e8f0;margin:18px 0;">
+
+    <h3 style="font-size:.95rem;margin:0 0 10px;">لینک مستقیم خارجی (هاست دانلود)</h3>
     <form method="post" action="/admin/books/{{ book.id }}/external-url" class="admin-form">
         <div class="form-grid">
             <div class="form-field full">
@@ -152,7 +187,7 @@
                 <input id="external_url" name="external_url" dir="ltr"
                        value="{{ book.external_file_url or '' }}"
                        placeholder="https://dl.example.com/path/file.pdf">
-                <p class="form-hint">این آدرس فقط در سرور ذخیره می‌شود و از طریق پروکسی امن به مشتری داده می‌شود.</p>
+                <p class="form-hint">فقط در سرور ذخیره می‌شود و از طریق پروکسی امن به مشتری می‌رسد.</p>
             </div>
         </div>
         <div class="form-actions btn-row">
@@ -163,12 +198,12 @@
             {% endif %}
         </div>
     </form>
-</div>
+</section>
 
-<div class="card" style="max-width:640px;margin-bottom:24px;">
-    <h3 style="font-size:1rem;margin:0 0 12px;">لینک دانلود امن برای ارسال به مشتری</h3>
-    <p style="color:#64748b;font-size:.85rem;margin:0 0 12px;">
-        با TTL فعلی ({{ ttl_hours }} ساعت) لینک امن می‌سازد — مناسب وقتی مشتری نباید دوباره به سایت بیاید.
+<section class="admin-section" id="secure-link">
+    <h2>لینک دانلود امن</h2>
+    <p class="section-lead">
+        با اعتبار فعلی ({{ ttl_hours }} ساعت) لینک یک‌بارمصرف/زمان‌دار برای ارسال مستقیم به مشتری می‌سازد.
     </p>
     <form method="post" action="/admin/books/{{ book.id }}/secure-link" class="admin-form">
         <div class="form-grid">
@@ -182,13 +217,14 @@
             <a class="btn btn-secondary" href="/admin/download-links">مدیریت لینک‌ها</a>
         </div>
     </form>
-</div>
+</section>
 
-<p style="color:#64748b;font-size:.85rem;margin-top:8px;">پوشه: <span dir="ltr">{{ book.folder_name }}</span></p>
-
-<hr>
-<form method="post" action="/admin/books/{{ book.id }}/delete"
-      onsubmit="return confirm('کتاب برای همیشه حذف شود؟ سفارش‌های قبلی عنوان را نگه می‌دارند.');">
-    <button class="btn btn-danger" type="submit">حذف کامل کتاب</button>
-</form>
+<section class="admin-section danger-zone" id="danger-zone">
+    <h2>حذف کتاب</h2>
+    <p class="section-lead">حذف دائمی است. عنوان در سفارش‌های قبلی حفظ می‌شود، ولی کتاب از فروشگاه برداشته می‌شود.</p>
+    <form method="post" action="/admin/books/{{ book.id }}/delete"
+          onsubmit="return confirm('کتاب «{{ book.display_title }}» برای همیشه حذف شود؟');">
+        <button class="btn btn-danger" type="submit">حذف کامل کتاب</button>
+    </form>
+</section>
 {% endblock %}

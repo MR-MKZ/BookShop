@@ -2,8 +2,16 @@
 {% from "admin/macros.html" import date_range_filter, sales_books_charts %}
 {% block title %}داشبورد{% endblock %}
 {% block content %}
-<h1>داشبورد</h1>
-<p>خوش آمدید {{ admin.display_name }}</p>
+<div class="page-header">
+    <div>
+        <h1>داشبورد</h1>
+        <p class="page-sub">خوش آمدید {{ admin.display_name }}</p>
+    </div>
+    <div class="page-actions btn-row">
+        <a class="btn" href="/admin/books/new">افزودن کتاب</a>
+        <a class="btn btn-secondary" href="/admin/books?missing_pdf=1">بدون فایل</a>
+    </div>
+</div>
 <div class="cards">
     <div class="card"><div class="num">{{ "{:,.0f}".format(stats.sales_today|float) }}</div><div class="label">فروش امروز (تومان)</div></div>
     <div class="card"><div class="num">{{ "{:,.0f}".format(stats.sales_month|float) }}</div><div class="label">فروش این ماه</div></div>
@@ -17,19 +25,18 @@
     <div class="label">آخرین اسکرپر</div>
     <p style="margin:8px 0 0;">
         #{{ latest_scraper.id }} —
-        {% if latest_scraper.status.value == 'RUNNING' %}<span class="badge" style="background:#bfdbfe;">RUNNING</span>
-        {% elif latest_scraper.status.value == 'COMPLETED' %}<span class="badge badge-ok">COMPLETED</span>
-        {% else %}<span class="badge badge-no">FAILED</span>{% endif %}
+        {% if latest_scraper.status.value == 'RUNNING' %}<span class="badge" style="background:#bfdbfe;color:#1e3a8a;">در حال اجرا</span>
+        {% elif latest_scraper.status.value == 'COMPLETED' %}<span class="badge badge-ok">موفق</span>
+        {% else %}<span class="badge badge-no">ناموفق</span>{% endif %}
         — صفحات {{ latest_scraper.pages_done or 0 }}/{{ latest_scraper.pages_total or '?' }}
         — ذخیره {{ latest_scraper.books_saved or 0 }}
     </p>
 </div>
 {% endif %}
 <p class="btn-row">
-    <a class="btn" href="/admin/books?missing_pdf=1">آپلود فایل‌های مفقود</a>
-    <a class="btn" href="/admin/books/new">افزودن کتاب</a>
     <a class="btn btn-secondary" href="/admin/scraper">وضعیت اسکرپر</a>
     <a class="btn btn-secondary" href="/admin/reports">گزارش فروش</a>
+    <a class="btn btn-secondary" href="/admin/categories">دسته‌بندی‌ها</a>
 </p>
 
 <section class="chart-section">

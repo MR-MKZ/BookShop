@@ -716,6 +716,7 @@ async def admin_books(
 @router.get("/books/new", response_class=HTMLResponse)
 async def admin_book_new_form(
     request: Request,
+    db: AsyncSession = Depends(get_async_db),
     admin: User = Depends(require_admin),
 ):
     return templates.TemplateResponse(
@@ -725,6 +726,8 @@ async def admin_book_new_form(
             "admin": admin,
             "error": None,
             "allowed_exts": sorted(ALLOWED_BOOK_EXTS),
+            "categories": await _all_categories(db),
+            "selected_category_ids": set(),
         },
     )
 
@@ -746,16 +749,30 @@ async def admin_book_create(
     db: AsyncSession = Depends(get_async_db),
     admin: User = Depends(require_admin),
 ):
+    async def _new_ctx(error: str, selected: set[int] | None = None):
+        return {
+            "request": request,
+            "admin": admin,
+            "error": error,
+            "allowed_exts": sorted(ALLOWED_BOOK_EXTS),
+            "categories": await _all_categories(db),
+            "selected_category_ids": selected or set(),
+        }
+
+    form = await request.form()
+    category_ids: list[int] = []
+    for raw in form.getlist("category_ids"):
+        try:
+            category_ids.append(int(raw))
+        except (TypeError, ValueError):
+            continue
+    selected_ids = set(category_ids)
+
     title = title.strip()
     if not title:
         return templates.TemplateResponse(
             "admin/book_new.html",
-            {
-                "request": request,
-                "admin": admin,
-                "error": "عنوان الزامی است",
-                "allowed_exts": sorted(ALLOWED_BOOK_EXTS),
-            },
+            await _new_ctx("عنوان الزامی است", selected_ids),
             status_code=400,
         )
 
@@ -763,12 +780,7 @@ async def admin_book_create(
     if isinstance(parsed, str):
         return templates.TemplateResponse(
             "admin/book_new.html",
-            {
-                "request": request,
-                "admin": admin,
-                "error": parsed,
-                "allowed_exts": sorted(ALLOWED_BOOK_EXTS),
-            },
+            await _new_ctx(parsed, selected_ids),
             status_code=400,
         )
     price_val, orig_val = parsed
@@ -796,18 +808,23 @@ async def admin_book_create(
     book.url = f"manual://{folder_name}"
     book.ensure_slug()
 
+    if category_ids:
+        cats = list(
+            (
+                await db.execute(select(Category).where(Category.id.in_(category_ids)))
+            )
+            .scalars()
+            .all()
+        )
+        book.categories = cats
+
     if cover and cover.filename:
         ext = _file_ext(cover.filename)
         if ext not in ALLOWED_COVER_EXTS:
             await db.rollback()
             return templates.TemplateResponse(
                 "admin/book_new.html",
-                {
-                    "request": request,
-                    "admin": admin,
-                    "error": "فرمت کاور مجاز نیست (jpg/png/webp)",
-                    "allowed_exts": sorted(ALLOWED_BOOK_EXTS),
-                },
+                await _new_ctx("فرمت کاور مجاز نیست (jpg/png/webp)", selected_ids),
                 status_code=400,
             )
         cover_data = await cover.read()
@@ -822,12 +839,10 @@ async def admin_book_create(
             await db.rollback()
             return templates.TemplateResponse(
                 "admin/book_new.html",
-                {
-                    "request": request,
-                    "admin": admin,
-                    "error": f"فرمت فایل مجاز نیست. مجاز: {', '.join(sorted(ALLOWED_BOOK_EXTS))}",
-                    "allowed_exts": sorted(ALLOWED_BOOK_EXTS),
-                },
+                await _new_ctx(
+                    f"فرمت فایل مجاز نیست. مجاز: {', '.join(sorted(ALLOWED_BOOK_EXTS))}",
+                    selected_ids,
+                ),
                 status_code=400,
             )
         data = await file.read()

@@ -1,13 +1,18 @@
 {% extends "admin/base.html" %}
 {% block title %}لینک‌های دانلود{% endblock %}
 {% block content %}
-<h1>لینک‌های دانلود امن</h1>
+<div class="page-header">
+    <div>
+        <h1>لینک‌های دانلود امن</h1>
+        <p class="page-sub">لینک‌های فعال برای ارسال به مشتری — منقضی‌ها خودکار حذف می‌شوند</p>
+    </div>
+</div>
 {% if message == 'revoked' %}
-<div class="msg">لینک باطل و از لیست حذف شد.</div>
+<div class="msg msg-ok">لینک باطل و از لیست حذف شد.</div>
 {% elif message %}
-<div class="msg">{{ message }}</div>
+<div class="msg msg-ok">{{ message }}</div>
 {% endif %}
-<p style="color:#64748b;font-size:.9rem;">لینک‌های منقضی یا باطل‌شده به‌صورت خودکار از این لیست حذف می‌شوند. زمان‌ها به وقت تهران (جلالی) است.</p>
+{% if rows %}
 <table>
     <thead>
         <tr>
@@ -40,14 +45,18 @@
             </td>
             <td>
                 <form method="post" action="/admin/download-links/{{ row.link.id }}/revoke"
-                      onsubmit="return confirm('این لینک باطل شود؟');">
-                    <button class="btn btn-sm btn-danger" type="submit">منقضی کردن</button>
+                      onsubmit="return confirm('این لینک باطل شود و دیگر کار نکند؟');">
+                    <button class="btn btn-sm btn-danger" type="submit">باطل کردن</button>
                 </form>
             </td>
         </tr>
-        {% else %}
-        <tr><td colspan="7">لینک فعالی وجود ندارد</td></tr>
         {% endfor %}
     </tbody>
 </table>
+{% else %}
+<div class="empty-state">
+    <p>لینک فعالی وجود ندارد. از صفحه ویرایش کتاب می‌توانید لینک امن بسازید.</p>
+    <a class="btn" href="/admin/books">رفتن به کتاب‌ها</a>
+</div>
+{% endif %}
 {% endblock %}

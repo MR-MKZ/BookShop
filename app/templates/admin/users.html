@@ -2,16 +2,23 @@
 {% from "macros.html" import page_pagination %}
 {% block title %}کاربران{% endblock %}
 {% block content %}
-<h1>کاربران</h1>
-{% if message %}<div class="msg">عملیات با موفقیت انجام شد ({{ message }})</div>{% endif %}
+<div class="page-header">
+    <div>
+        <h1>کاربران</h1>
+        <p class="page-sub">جستجو و مدیریت دسترسی کاربران</p>
+    </div>
+</div>
+{% if message %}<div class="msg msg-ok">عملیات انجام شد.</div>{% endif %}
 <form class="filters" method="get">
     <input type="text" name="q" value="{{ q }}" placeholder="نام، موبایل، ایمیل">
-    <button class="btn" type="submit">جستجو</button>
+    <button class="btn btn-secondary" type="submit">جستجو</button>
+    {% if q %}<a class="btn btn-secondary" href="/admin/users">پاک کردن</a>{% endif %}
 </form>
-<p>{{ total }} کاربر</p>
+<p class="list-meta">{{ total }} کاربر</p>
+{% if users %}
 <table>
     <thead>
-        <tr><th>شناسه</th><th>نام</th><th>موبایل</th><th>نقش</th><th>وضعیت</th><th></th></tr>
+        <tr><th>شناسه</th><th>نام</th><th>موبایل</th><th>نقش</th><th>وضعیت</th><th>عملیات</th></tr>
     </thead>
     <tbody>
         {% for u in users %}
@@ -19,21 +26,27 @@
             <td>{{ u.id }}</td>
             <td>{{ u.display_name }}</td>
             <td dir="ltr">{{ u.phone }}</td>
-            <td>{{ u.role.value }}</td>
+            <td>{% if u.role.value == 'ADMIN' %}ادمین{% else %}کاربر{% endif %}</td>
             <td>{% if u.is_active %}<span class="badge badge-ok">فعال</span>{% else %}<span class="badge badge-no">غیرفعال</span>{% endif %}</td>
             <td>
-                <a class="btn btn-sm btn-secondary" href="/admin/users/{{ u.id }}">ویرایش</a>
-                <form class="inline" method="post" action="/admin/users/{{ u.id }}/toggle">
-                    <button class="btn btn-sm {% if u.is_active %}btn-danger{% else %}btn{% endif %}" type="submit">
-                        {% if u.is_active %}غیرفعال{% else %}فعال{% endif %}
-                    </button>
-                </form>
+                <div class="btn-row btn-row-sm">
+                    <a class="btn btn-sm btn-secondary" href="/admin/users/{{ u.id }}">ویرایش</a>
+                    <form method="post" action="/admin/users/{{ u.id }}/toggle"
+                          onsubmit="return confirm('{% if u.is_active %}غیرفعال{% else %}فعال{% endif %} کردن «{{ u.display_name }}»؟');">
+                        <button class="btn btn-sm {% if u.is_active %}btn-danger{% else %}btn{% endif %}" type="submit">
+                            {% if u.is_active %}غیرفعال{% else %}فعال{% endif %}
+                        </button>
+                    </form>
+                </div>
             </td>
         </tr>
-        {% else %}
-        <tr><td colspan="6">موردی نیست</td></tr>
         {% endfor %}
     </tbody>
 </table>
 {{ page_pagination(page, total_pages, '/admin/users?q=' ~ (q|urlencode), 'admin') }}
+{% else %}
+<div class="empty-state">
+    <p>{% if q %}با این جستجو کاربری پیدا نشد.{% else %}کاربری ثبت نشده است.{% endif %}</p>
+</div>
+{% endif %}
 {% endblock %}

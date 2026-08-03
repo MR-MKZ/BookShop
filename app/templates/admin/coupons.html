@@ -1,54 +1,65 @@
 {% extends "admin/base.html" %}
 {% from "macros.html" import page_pagination %}
-{% block title %}کدهای تخفیف{% endblock %}
+{% block title %}تخفیف و تنظیمات{% endblock %}
 {% block content %}
-<h1>کدهای تخفیف</h1>
+<div class="page-header">
+    <div>
+        <h1>تخفیف و تنظیمات دانلود</h1>
+        <p class="page-sub">کد تخفیف، مدت لینک دانلود، و پیام آماده‌سازی فایل</p>
+    </div>
+    <div class="page-actions btn-row">
+        <a class="btn" href="/admin/coupons/new">کد تخفیف جدید</a>
+    </div>
+</div>
 {% if message == 'ttl_saved' %}
-<div class="msg">مدت اعتبار لینک دانلود ذخیره شد.</div>
+<div class="msg msg-ok">مدت اعتبار لینک دانلود ذخیره شد.</div>
 {% elif message == 'pending_msg_saved' %}
-<div class="msg">پیام آماده‌سازی فایل ذخیره شد.</div>
+<div class="msg msg-ok">پیام آماده‌سازی فایل ذخیره شد.</div>
 {% elif message == 'deleted' %}
-<div class="msg">کد تخفیف حذف شد.</div>
+<div class="msg msg-ok">کد تخفیف حذف شد.</div>
 {% elif message == 'deactivated' %}
-<div class="msg">کد به‌خاطر استفاده در سفارش‌ها غیرفعال شد.</div>
+<div class="msg msg-ok">کد به‌خاطر استفاده در سفارش‌ها غیرفعال شد.</div>
 {% elif message == 'ttl_invalid' %}
-<div class="msg" style="background:#fef2f2;color:#b91c1c;">مقدار TTL نامعتبر است.</div>
+<div class="msg msg-err">مقدار مدت اعتبار نامعتبر است.</div>
 {% elif message %}
-<div class="msg">عملیات انجام شد ({{ message }}).</div>
+<div class="msg msg-ok">عملیات انجام شد.</div>
 {% endif %}
 
-<div class="card" style="margin-bottom:24px;max-width:480px;">
-    <h2 style="font-size:1.1rem;">مدت اعتبار لینک دانلود</h2>
-    <form method="post" action="/admin/settings/download-ttl" class="filters" style="margin:0;">
-        <label>
-            ساعت
-            <input type="number" name="hours" min="1" max="720" value="{{ ttl_hours }}" required style="width:100px;">
-        </label>
-        <button class="btn" type="submit">ذخیره</button>
-    </form>
-    <p style="color:#64748b;font-size:.85rem;margin:8px 0 0;">پیش‌فرض ۶ ساعت. پس از انقضا کاربر می‌تواند از بازیابی سفارش لینک جدید بگیرد.</p>
-</div>
-
-<div class="card" style="margin-bottom:24px;max-width:640px;">
-    <h2 style="font-size:1.1rem;">پیام وقتی فایل هنوز آماده نیست</h2>
-    <form method="post" action="/admin/settings/pending-file-message" class="admin-form">
-        <div class="form-field full">
-            <textarea name="message" rows="5" required>{{ pending_message }}</textarea>
-            <p class="form-hint" style="color:#64748b;font-size:.85rem;margin:8px 0 0;">
-                جایگذاری‌ها: <code dir="ltr">{order_id}</code>،
-                <code dir="ltr">{book_title}</code>،
-                <code dir="ltr">{phone}</code>،
-                <code dir="ltr">{email}</code>
-            </p>
+<details class="panel-details" open>
+    <summary>تنظیمات دانلود</summary>
+    <div class="panel-body">
+        <div class="admin-form" style="margin-bottom:18px;">
+            <h3 style="font-size:1rem;margin:0 0 8px;">مدت اعتبار لینک دانلود</h3>
+            <p class="form-hint" style="margin:0 0 10px;">پس از انقضا کاربر می‌تواند از بازیابی سفارش لینک جدید بگیرد. پیش‌فرض ۶ ساعت.</p>
+            <form method="post" action="/admin/settings/download-ttl" class="filters" style="margin:0;">
+                <label>
+                    ساعت
+                    <input type="number" name="hours" min="1" max="720" value="{{ ttl_hours }}" required style="width:100px;">
+                </label>
+                <button class="btn" type="submit">ذخیره</button>
+            </form>
         </div>
-        <button class="btn" type="submit" style="margin-top:8px;">ذخیره پیام</button>
-    </form>
-</div>
+        <div class="admin-form">
+            <h3 style="font-size:1rem;margin:0 0 8px;">پیام وقتی فایل هنوز آماده نیست</h3>
+            <form method="post" action="/admin/settings/pending-file-message">
+                <div class="form-field full">
+                    <textarea name="message" rows="5" required>{{ pending_message }}</textarea>
+                    <p class="form-hint" style="margin:8px 0 0;">
+                        جایگذاری‌ها:
+                        <code dir="ltr">{order_id}</code>،
+                        <code dir="ltr">{book_title}</code>،
+                        <code dir="ltr">{phone}</code>،
+                        <code dir="ltr">{email}</code>
+                    </p>
+                </div>
+                <button class="btn" type="submit" style="margin-top:8px;">ذخیره پیام</button>
+            </form>
+        </div>
+    </div>
+</details>
 
-<div class="btn-row" style="margin-bottom:16px;">
-    <a class="btn" href="/admin/coupons/new">کد تخفیف جدید</a>
-</div>
-<p>{{ total }} کد</p>
+<h2 style="font-size:1.1rem;margin:20px 0 10px;">کدهای تخفیف</h2>
+<p class="list-meta">{{ total }} کد</p>
 <table>
     <thead>
         <tr>
@@ -84,7 +95,7 @@
                 <div class="btn-row btn-row-sm">
                     <a class="btn btn-sm btn-secondary" href="/admin/coupons/{{ c.id }}">ویرایش</a>
                     <form method="post" action="/admin/coupons/{{ c.id }}/delete"
-                          onsubmit="return confirm('حذف / غیرفعال شود؟');">
+                          onsubmit="return confirm('کد «{{ c.code }}» حذف یا غیرفعال شود؟');">
                         <button class="btn btn-sm btn-danger" type="submit">حذف</button>
                     </form>
                 </div>

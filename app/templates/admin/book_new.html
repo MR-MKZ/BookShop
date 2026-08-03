@@ -1,62 +1,95 @@
 {% extends "admin/base.html" %}
 {% block title %}افزودن کتاب{% endblock %}
 {% block content %}
-<h1>افزودن کتاب دستی</h1>
-{% if error %}<div class="msg" style="background:#fecaca;color:#991b1b;">{{ error }}</div>{% endif %}
-
-<form class="admin-form" method="post" action="/admin/books/new" enctype="multipart/form-data">
-    <div class="form-grid">
-        <div class="form-field full">
-            <label for="title">عنوان فارسی</label>
-            <input id="title" name="title" required>
-        </div>
-        <div class="form-field full">
-            <label for="title_en">عنوان انگلیسی</label>
-            <input id="title_en" name="title_en" dir="ltr">
-        </div>
-        <div class="form-field">
-            <label for="author">نویسنده</label>
-            <input id="author" name="author">
-        </div>
-        <div class="form-field">
-            <label for="publisher">ناشر</label>
-            <input id="publisher" name="publisher">
-        </div>
-        <div class="form-field full">
-            <label for="isbn">ISBN</label>
-            <input id="isbn" name="isbn" dir="ltr">
-        </div>
-        <div class="form-field">
-            <label for="price">قیمت فروش (تومان)</label>
-            <input id="price" name="price" value="0" dir="ltr">
-        </div>
-        <div class="form-field">
-            <label for="original_price">قیمت اصلی خط‌خورده</label>
-            <input id="original_price" name="original_price" dir="ltr">
-        </div>
-        <div class="form-field full">
-            <label for="description">توضیحات</label>
-            <textarea id="description" name="description" rows="6"></textarea>
-        </div>
-        <div class="form-field full">
-            <label class="form-check">
-                <input type="checkbox" name="is_active" checked>
-                فعال
-            </label>
-        </div>
-        <div class="form-field">
-            <label for="cover">کاور (اختیاری)</label>
-            <input id="cover" type="file" name="cover" accept=".jpg,.jpeg,.png,.webp">
-        </div>
-        <div class="form-field">
-            <label for="file">فایل کتاب (اختیاری)</label>
-            <input id="file" type="file" name="file" accept=".{{ allowed_exts|join(',.') }}">
-            <p class="form-hint">{{ allowed_exts|join(', ') }}</p>
-        </div>
+<div class="page-header">
+    <div>
+        <nav class="crumbs" aria-label="مسیر">
+            <a href="/admin/books">کتاب‌ها</a>
+            <span class="sep">/</span>
+            <span>افزودن</span>
+        </nav>
+        <h1>افزودن کتاب</h1>
+        <p class="page-sub">اطلاعات پایه را وارد کنید؛ بعداً می‌توانید فایل و لینک را تکمیل کنید</p>
     </div>
-    <div class="form-actions">
-        <button class="btn" type="submit">ایجاد</button>
+    <div class="page-actions btn-row">
         <a class="btn btn-secondary" href="/admin/books">بازگشت</a>
     </div>
-</form>
+</div>
+
+{% if error %}<div class="msg msg-err">{{ error }}</div>{% endif %}
+
+<section class="admin-section">
+    <h2>اطلاعات کتاب</h2>
+    <form class="admin-form" method="post" action="/admin/books/new" enctype="multipart/form-data">
+        <div class="form-grid">
+            <div class="form-field full">
+                <label for="title">عنوان فارسی</label>
+                <input id="title" name="title" required>
+            </div>
+            <div class="form-field full">
+                <label for="title_en">عنوان انگلیسی</label>
+                <input id="title_en" name="title_en" dir="ltr">
+                <p class="form-hint">برای آدرس SEO پیشنهاد می‌شود.</p>
+            </div>
+            <div class="form-field">
+                <label for="author">نویسنده</label>
+                <input id="author" name="author">
+            </div>
+            <div class="form-field">
+                <label for="publisher">ناشر</label>
+                <input id="publisher" name="publisher">
+            </div>
+            <div class="form-field full">
+                <label for="isbn">ISBN</label>
+                <input id="isbn" name="isbn" dir="ltr">
+            </div>
+            <div class="form-field">
+                <label for="price">قیمت فروش (تومان)</label>
+                <input id="price" name="price" value="0" dir="ltr">
+            </div>
+            <div class="form-field">
+                <label for="original_price">قیمت اصلی خط‌خورده</label>
+                <input id="original_price" name="original_price" dir="ltr">
+            </div>
+            <div class="form-field full">
+                <label for="description">توضیحات</label>
+                <textarea id="description" name="description" rows="6"></textarea>
+            </div>
+            <div class="form-field full">
+                <label>دسته‌بندی‌ها</label>
+                <div class="category-checks">
+                    {% for cat in categories %}
+                    <label class="form-check" style="margin:0;">
+                        <input type="checkbox" name="category_ids" value="{{ cat.id }}"
+                               {% if cat.id in selected_category_ids %}checked{% endif %}>
+                        {{ cat.name }}
+                    </label>
+                    {% else %}
+                    <span style="color:#64748b;font-size:.85rem;">هنوز دسته‌ای نیست —
+                        <a href="/admin/categories#cat-new">بسازید</a>.</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="form-field full">
+                <label class="form-check">
+                    <input type="checkbox" name="is_active" checked>
+                    فعال در فروشگاه
+                </label>
+            </div>
+            <div class="form-field">
+                <label for="cover">کاور (اختیاری)</label>
+                <input id="cover" type="file" name="cover" accept=".jpg,.jpeg,.png,.webp">
+            </div>
+            <div class="form-field">
+                <label for="file">فایل کتاب (اختیاری)</label>
+                <input id="file" type="file" name="file" accept=".{{ allowed_exts|join(',.') }}">
+                <p class="form-hint">{{ allowed_exts|join(', ') }}</p>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn" type="submit">ایجاد کتاب</button>
+            <a class="btn btn-secondary" href="/admin/books">انصراف</a>
+        </div>
+    </form>
+</section>
 {% endblock %}

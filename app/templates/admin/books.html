@@ -2,20 +2,42 @@
 {% from "macros.html" import page_pagination %}
 {% block title %}کتاب‌ها{% endblock %}
 {% block content %}
-<h1>مدیریت کتاب‌ها</h1>
+<div class="page-header">
+    <div>
+        <h1>کتاب‌ها</h1>
+        <p class="page-sub">جستجو، ویرایش، و مدیریت فایل کتاب‌ها</p>
+    </div>
+    <div class="page-actions btn-row">
+        <a class="btn" href="/admin/books/new">افزودن کتاب</a>
+        <a class="btn btn-secondary" href="/admin/categories#bulk-assign">اختصاص دسته</a>
+    </div>
+</div>
+
 {% if message == 'uploaded' %}
-<div class="msg">فایل{% if uploaded_id %} کتاب #{{ uploaded_id }}{% endif %} با موفقیت آپلود شد.</div>
+<div class="msg msg-ok">فایل{% if uploaded_id %} کتاب #{{ uploaded_id }}{% endif %} با موفقیت آپلود شد.</div>
+{% elif message == 'deleted' %}
+<div class="msg msg-ok">کتاب حذف شد.</div>
+{% elif message == 'created' %}
+<div class="msg msg-ok">کتاب ایجاد شد.</div>
 {% elif message %}
-<div class="msg">عملیات با موفقیت انجام شد ({{ message }})</div>
+<div class="msg msg-ok">عملیات انجام شد.</div>
 {% endif %}
+
 <form class="filters" method="get" action="/admin/books">
-    <input type="text" name="q" value="{{ q }}" placeholder="شناسه / عنوان FA/EN / نویسنده / ناشر / ISBN / پوشه" style="min-width:280px;">
-    <label><input type="checkbox" name="missing_pdf" value="1" {% if missing_pdf %}checked{% endif %}> فقط بدون فایل</label>
-    <button class="btn" type="submit">فیلتر</button>
-    <a class="btn" href="/admin/books/new">افزودن کتاب</a>
-    <a class="btn btn-secondary" href="/admin/categories#bulk-assign">اختصاص گروهی دسته</a>
+    <input type="text" name="q" value="{{ q }}" placeholder="شناسه، عنوان، نویسنده، ناشر، ISBN…" style="min-width:260px;">
+    <label class="form-check" style="margin:0;white-space:nowrap;">
+        <input type="checkbox" name="missing_pdf" value="1" {% if missing_pdf %}checked{% endif %}>
+        فقط بدون فایل
+    </label>
+    <button class="btn btn-secondary" type="submit">اعمال فیلتر</button>
+    {% if q or missing_pdf %}
+    <a class="btn btn-secondary" href="/admin/books">پاک کردن</a>
+    {% endif %}
 </form>
-<p>{{ total }} کتاب — صفحه {{ page }}{% if total_pages %} از {{ total_pages }}{% endif %}</p>
+
+<p class="list-meta">{{ total }} کتاب{% if total_pages %} — صفحه {{ page }} از {{ total_pages }}{% endif %}</p>
+
+{% if books %}
 <table>
     <thead>
         <tr>
@@ -43,28 +65,29 @@
                     <span class="badge badge-ok">{{ book.file_format or 'pdf' }}</span>
                 {% else %}
                     <span class="badge badge-no">ندارد</span>
-                    <form class="inline list-upload-form" action="/admin/books/{{ book.id }}/upload" method="post" enctype="multipart/form-data">
-                        <input type="hidden" name="next" value="/admin/books?q={{ q|urlencode }}&missing_pdf={{ missing_pdf }}&page={{ page }}">
-                        <input type="file" name="file" accept=".{{ allowed_exts|join(',.') }}" required>
-                        <button class="btn btn-sm" type="submit">آپلود</button>
-                    </form>
                 {% endif %}
             </td>
-            <td>{% if book.is_active %}فعال{% else %}غیرفعال{% endif %}</td>
+            <td>{% if book.is_active %}<span class="badge badge-ok">فعال</span>{% else %}<span class="badge badge-muted">غیرفعال</span>{% endif %}</td>
             <td>
                 <div class="btn-row btn-row-sm">
-                    <a class="btn btn-sm btn-secondary" href="/admin/books/{{ book.id }}">ویرایش</a>
-                    <form method="post" action="/admin/books/{{ book.id }}/delete"
-                          onsubmit="return confirm('حذف کامل کتاب #{{ book.id }}؟');">
-                        <button class="btn btn-sm btn-danger" type="submit">حذف</button>
-                    </form>
+                    <a class="btn btn-sm" href="/admin/books/{{ book.id }}">ویرایش</a>
+                    {% if not book.has_pdf %}
+                    <a class="btn btn-sm btn-secondary" href="/admin/books/{{ book.id }}#file-source">آپلود فایل</a>
+                    {% endif %}
                 </div>
             </td>
         </tr>
-        {% else %}
-        <tr><td colspan="7">موردی یافت نشد</td></tr>
         {% endfor %}
     </tbody>
 </table>
 {{ page_pagination(page, total_pages, '/admin/books?q=' ~ (q|urlencode) ~ '&missing_pdf=' ~ missing_pdf, 'admin') }}
+{% else %}
+<div class="empty-state">
+    <p>{% if q or missing_pdf %}با این فیلتر کتابی پیدا نشد.{% else %}هنوز کتابی ثبت نشده است.{% endif %}</p>
+    <div class="btn-row" style="justify-content:center;">
+        {% if q or missing_pdf %}<a class="btn btn-secondary" href="/admin/books">پاک کردن فیلتر</a>{% endif %}
+        <a class="btn" href="/admin/books/new">افزودن کتاب</a>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
