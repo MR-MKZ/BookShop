@@ -3,9 +3,9 @@
 {% block content %}
 <h1>ویرایش کاربر #{{ user.id }}</h1>
 {% if message %}<div class="msg">عملیات با موفقیت انجام شد ({{ message }})</div>{% endif %}
-{% if error %}<div class="msg" style="background:#fecaca;color:#991b1b;">{{ error }}</div>{% endif %}
+{% if error %}<div class="msg msg-err">{{ error }}</div>{% endif %}
 
-<form class="admin-form" method="post" action="/admin/users/{{ user.id }}" style="max-width:720px;">
+<form class="admin-form" method="post" action="/admin/users/{{ user.id }}">
     <div class="form-grid">
         <div class="form-field">
             <label for="first_name">نام</label>

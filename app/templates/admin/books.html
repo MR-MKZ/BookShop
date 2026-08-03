@@ -24,7 +24,7 @@
 {% endif %}
 
 <form class="filters" method="get" action="/admin/books">
-    <input type="text" name="q" value="{{ q }}" placeholder="شناسه، عنوان، نویسنده، ناشر، ISBN…" style="min-width:260px;">
+    <input type="text" name="q" value="{{ q }}" placeholder="شناسه، عنوان، نویسنده، ناشر، ISBN…" class="filter-q">
     <label class="form-check" style="margin:0;white-space:nowrap;">
         <input type="checkbox" name="missing_pdf" value="1" {% if missing_pdf %}checked{% endif %}>
         فقط بدون فایل

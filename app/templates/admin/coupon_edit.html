@@ -1,65 +1,70 @@
 {% extends "admin/base.html" %}
 {% block title %}{% if coupon %}ویرایش کد{% else %}کد جدید{% endif %}{% endblock %}
 {% block content %}
-<h1>{% if coupon %}ویرایش کد تخفیف{% else %}کد تخفیف جدید{% endif %}</h1>
-{% if error %}
-<div class="msg" style="background:#fef2f2;color:#b91c1c;">{{ error }}</div>
-{% endif %}
-{% if request.query_params.get('msg') %}
-<div class="msg">ذخیره شد.</div>
-{% endif %}
-
-<form method="post" action="{% if coupon %}/admin/coupons/{{ coupon.id }}{% else %}/admin/coupons/new{% endif %}"
-      style="max-width:560px;background:#fff;padding:20px;border-radius:8px;">
-    <div class="form-group" style="margin-bottom:12px;">
-        <label for="code">کد</label>
-        <input id="code" name="code" type="text" value="{{ form.code }}" required dir="ltr"
-               style="width:100%;padding:8px;" placeholder="SUMMER1405">
+<div class="page-header">
+    <div>
+        <nav class="crumbs" aria-label="مسیر">
+            <a href="/admin/coupons">تخفیف و تنظیمات</a>
+            <span class="sep">/</span>
+            <span>{% if coupon %}ویرایش{% else %}جدید{% endif %}</span>
+        </nav>
+        <h1>{% if coupon %}ویرایش کد تخفیف{% else %}کد تخفیف جدید{% endif %}</h1>
     </div>
-    <div class="form-group" style="margin-bottom:12px;">
-        <label for="discount_type">نوع</label>
-        <select id="discount_type" name="discount_type" style="width:100%;padding:8px;">
-            <option value="PERCENT" {% if form.discount_type == 'PERCENT' %}selected{% endif %}>درصدی</option>
-            <option value="FIXED" {% if form.discount_type == 'FIXED' %}selected{% endif %}>مبلغ ثابت (تومان)</option>
-        </select>
-    </div>
-    <div class="form-group" style="margin-bottom:12px;">
-        <label for="amount">مقدار</label>
-        <input id="amount" name="amount" type="number" step="1" min="1" value="{{ form.amount }}" required
-               style="width:100%;padding:8px;" dir="ltr">
-    </div>
-    <div class="form-group" style="margin-bottom:12px;">
-        <label for="max_uses">سقف تعداد استفاده (خالی = نامحدود)</label>
-        <input id="max_uses" name="max_uses" type="number" min="1" value="{{ form.max_uses }}"
-               style="width:100%;padding:8px;" dir="ltr">
-    </div>
-    <div class="form-group" style="margin-bottom:12px;">
-        <label for="min_order_amount">حداقل مبلغ سفارش (تومان، اختیاری)</label>
-        <input id="min_order_amount" name="min_order_amount" type="number" min="0"
-               value="{{ form.min_order_amount }}" style="width:100%;padding:8px;" dir="ltr">
-    </div>
-    <div class="form-group" style="margin-bottom:12px;">
-        <label for="starts_at">شروع اعتبار (تاریخ و ساعت)</label>
-        <input id="starts_at" name="starts_at" type="datetime-local" value="{{ form.starts_at }}"
-               style="width:100%;padding:8px;" dir="ltr">
-    </div>
-    <div class="form-group" style="margin-bottom:12px;">
-        <label for="ends_at">پایان اعتبار (تاریخ و ساعت)</label>
-        <input id="ends_at" name="ends_at" type="datetime-local" value="{{ form.ends_at }}"
-               style="width:100%;padding:8px;" dir="ltr">
-    </div>
-    <div class="form-group" style="margin-bottom:16px;">
-        <label>
-            <input type="checkbox" name="is_active" value="1" {% if form.is_active %}checked{% endif %}>
-            فعال
-        </label>
-    </div>
-    {% if coupon %}
-    <p style="color:#64748b;">تعداد استفاده تا الان: <strong>{{ coupon.used_count }}</strong></p>
-    {% endif %}
-    <div class="btn-row">
-        <button class="btn" type="submit">ذخیره</button>
+    <div class="page-actions btn-row">
         <a class="btn btn-secondary" href="/admin/coupons">بازگشت</a>
     </div>
-</form>
+</div>
+{% if error %}<div class="msg msg-err">{{ error }}</div>{% endif %}
+{% if request.query_params.get('msg') %}<div class="msg msg-ok">ذخیره شد.</div>{% endif %}
+
+<section class="admin-section">
+    <form method="post" action="{% if coupon %}/admin/coupons/{{ coupon.id }}{% else %}/admin/coupons/new{% endif %}" class="admin-form">
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="code">کد</label>
+                <input id="code" name="code" type="text" value="{{ form.code }}" required dir="ltr" placeholder="SUMMER1405">
+            </div>
+            <div class="form-field">
+                <label for="discount_type">نوع</label>
+                <select id="discount_type" name="discount_type">
+                    <option value="PERCENT" {% if form.discount_type == 'PERCENT' %}selected{% endif %}>درصدی</option>
+                    <option value="FIXED" {% if form.discount_type == 'FIXED' %}selected{% endif %}>مبلغ ثابت (تومان)</option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label for="amount">مقدار</label>
+                <input id="amount" name="amount" type="number" step="1" min="1" value="{{ form.amount }}" required dir="ltr">
+            </div>
+            <div class="form-field">
+                <label for="max_uses">سقف تعداد استفاده (خالی = نامحدود)</label>
+                <input id="max_uses" name="max_uses" type="number" min="1" value="{{ form.max_uses }}" dir="ltr">
+            </div>
+            <div class="form-field">
+                <label for="min_order_amount">حداقل مبلغ سفارش (تومان)</label>
+                <input id="min_order_amount" name="min_order_amount" type="number" min="0" value="{{ form.min_order_amount }}" dir="ltr">
+            </div>
+            <div class="form-field">
+                <label for="starts_at">شروع اعتبار</label>
+                <input id="starts_at" name="starts_at" type="datetime-local" value="{{ form.starts_at }}" dir="ltr">
+            </div>
+            <div class="form-field">
+                <label for="ends_at">پایان اعتبار</label>
+                <input id="ends_at" name="ends_at" type="datetime-local" value="{{ form.ends_at }}" dir="ltr">
+            </div>
+            <div class="form-field">
+                <label class="form-check" style="margin-top:28px;">
+                    <input type="checkbox" name="is_active" value="1" {% if form.is_active %}checked{% endif %}>
+                    فعال
+                </label>
+            </div>
+        </div>
+        {% if coupon %}
+        <p class="form-hint" style="margin:12px 0 0;">تعداد استفاده تا الان: <strong>{{ coupon.used_count }}</strong></p>
+        {% endif %}
+        <div class="form-actions">
+            <button class="btn" type="submit">ذخیره</button>
+            <a class="btn btn-secondary" href="/admin/coupons">انصراف</a>
+        </div>
+    </form>
+</section>
 {% endblock %}
