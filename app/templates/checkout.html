@@ -462,7 +462,7 @@
                                 </li>
                                 {% for book in books %}
                                 <li>
-                                    <a href="/book/{{ book.id }}">{{ book.title }}
+                                    <a href="{{ book.path }}">{{ book.display_title }}
                                         <span class="middle">× ۱</span>
                                         <span class="last">{{ format_price(book.price) }} تومان</span>
                                     </a>

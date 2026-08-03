@@ -1,19 +1,19 @@
 {% extends "base.html" %}
 {% from "macros.html" import dual_price %}
 
-{% block title %}{{ book.title or 'جزئیات کتاب' }} — لامابوک{% endblock %}
+{% block title %}خرید و دانلود نسخه کامل کتاب {{ book.seo_title_name }} — لامابوک{% endblock %}
 
 {% block meta_description -%}
 {%- if book.description -%}
 {{ book.description|striptags|truncate(160, True, '…') }}
 {%- else -%}
-دانلود و خرید کتاب «{{ book.title or 'بدون عنوان' }}»{% if book.author %} اثر {{ book.author }}{% endif %} از لامابوک — مرجع دانلود کتاب‌های الکترونیکی خارجی.
+خرید و دانلود نسخه کامل کتاب «{{ book.seo_title_name }}»{% if book.author %} اثر {{ book.author }}{% endif %} از لامابوک — مرجع دانلود کتاب‌های الکترونیکی خارجی.
 {%- endif -%}
 {%- endblock %}
 
 {% block og_type %}book{% endblock %}
 {% block og_image %}{{ site_origin }}/media/proxy/cover/{{ book.folder_name }}/{{ book.cover_filename or 'cover.jpg' }}{% endblock %}
-{% block og_image_alt %}جلد کتاب {{ book.title or 'لامابوک' }}{% endblock %}
+{% block og_image_alt %}جلد کتاب {{ book.seo_title_name }}{% endblock %}
 {% block og_image_size %}{% endblock %}
 {% block twitter_card %}summary_large_image{% endblock %}
 
@@ -22,8 +22,8 @@
 {
   "@context": "https://schema.org",
   "@type": "Book",
-  "name": {{ (book.title or 'بدون عنوان')|tojson }},
-  {% if book.title_en %}"alternateName": {{ book.title_en|tojson }},{% endif %}
+  "name": {{ book.seo_title_name|tojson }},
+  {% if book.title and book.title_en %}"alternateName": {{ book.title|tojson }},{% endif %}
   {% if book.author %}"author": { "@type": "Person", "name": {{ book.author|tojson }} },{% endif %}
   {% if book.description %}"description": {{ book.description|striptags|truncate(300, True, '')|tojson }},{% endif %}
   {% if book.isbn %}"isbn": {{ book.isbn|tojson }},{% endif %}
@@ -31,10 +31,10 @@
   {% if book.language %}"inLanguage": {{ book.language|tojson }},{% endif %}
   {% if book.pages %}"numberOfPages": {{ book.pages }},{% endif %}
   "image": {{ (site_origin ~ '/media/proxy/cover/' ~ book.folder_name ~ '/' ~ (book.cover_filename or 'cover.jpg'))|tojson }},
-  "url": {{ (site_origin ~ '/book/' ~ book.id)|tojson }},
+  "url": {{ (site_origin ~ book.path)|tojson }},
   "offers": {
     "@type": "Offer",
-    "url": {{ (site_origin ~ '/book/' ~ book.id)|tojson }},
+    "url": {{ (site_origin ~ book.path)|tojson }},
     "availability": "https://schema.org/InStock",
     "priceCurrency": "IRR"
   },
@@ -55,7 +55,7 @@
             <li class="chevron"><span class="fa fa-chevron-left"></span></li>
             <li><a href="/search" class="breadcrumb-link">کتاب‌ها</a></li>
             <li class="chevron"><span class="fa fa-chevron-left"></span></li>
-            <li><span class="breadcrumb-active">جزئیات کتاب</span></li>
+            <li><span class="breadcrumb-active">{{ book.display_title }}</span></li>
         </ul>
     </div>
 </div>
@@ -70,11 +70,14 @@
                 <div class="single-book d-flex mb-0">
                     <div class="book-img">
                         <img src="/media/proxy/cover/{{ book.folder_name }}/{{ book.cover_filename or 'cover.jpg' }}"
-                             alt="{{ book.title }}"
+                             alt="{{ book.seo_title_name }}"
                              onerror="this.onerror=null;this.src='/static/img/book/default.png'">
                     </div>
                     <div class="book-caption">
-                        <h3>{{ book.title or 'بدون عنوان' }}</h3>
+                        <h1 class="book-seo-heading">خرید و دانلود نسخه کامل کتاب {{ book.seo_title_name }}</h1>
+                        {% if book.title %}
+                            <p class="book-title-fa">{{ book.title }}</p>
+                        {% endif %}
                         {% if book.title_en %}
                             <p class="book-title-en">{{ book.title_en }}</p>
                         {% endif %}
@@ -129,7 +132,7 @@
     </div>
 </div>
 
-{# Tabs: توضیحات + مشخصات کتاب (kabana/book-details.html) #}
+{# RTL: first tab sits on the right — مشخصات default; توضیحات on click (left) #}
 <section class="our-client section-padding best-selling book-detail-tabs">
     <div class="container">
         <div class="row">
@@ -137,10 +140,10 @@
                 <div class="nav-button">
                     <nav>
                         <div class="nav nav-tabs" id="nav-tab" role="tablist">
-                            <a class="nav-link active" id="nav-one-tab" data-bs-toggle="tab" href="#nav-one"
-                               role="tab" aria-controls="nav-one" aria-selected="true">توضیحات</a>
-                            <a class="nav-link" id="nav-three-tab" data-bs-toggle="tab" href="#nav-three"
-                               role="tab" aria-controls="nav-three" aria-selected="false">مشخصات کتاب</a>
+                            <a class="nav-link active" id="nav-three-tab" data-bs-toggle="tab" href="#nav-three"
+                               role="tab" aria-controls="nav-three" aria-selected="true">مشخصات کتاب</a>
+                            <a class="nav-link" id="nav-one-tab" data-bs-toggle="tab" href="#nav-one"
+                               role="tab" aria-controls="nav-one" aria-selected="false">توضیحات</a>
                         </div>
                     </nav>
                 </div>
@@ -149,29 +152,23 @@
     </div>
     <div class="container">
         <div class="tab-content" id="nav-tabContent">
-            <div class="tab-pane fade show active" id="nav-one" role="tabpanel" aria-labelledby="nav-one-tab">
-                <div class="row">
-                    <div class="desc-tab col-12 col-lg-10 mx-auto">
-                        {% if book.description %}
-                            <p style="white-space: pre-wrap; line-height: 2;">{{ book.description }}</p>
-                        {% else %}
-                            <p>توضیحی برای این کتاب ثبت نشده است.</p>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-
-            <div class="tab-pane fade" id="nav-three" role="tabpanel" aria-labelledby="nav-three-tab">
+            <div class="tab-pane fade show active" id="nav-three" role="tabpanel" aria-labelledby="nav-three-tab">
                 <div class="row">
                     <div class="table-book col-12 col-lg-10 mx-auto">
                         <table class="details">
                             <thead>
                                 <tr>
                                     <th class="first">نام کتاب</th>
-                                    <th class="second">{{ book.title or '—' }}</th>
+                                    <th class="second">{{ book.display_title }}</th>
                                 </tr>
                             </thead>
                             <tbody>
+                                {% if book.title %}
+                                <tr>
+                                    <td class="first">عنوان فارسی</td>
+                                    <td class="second">{{ book.title }}</td>
+                                </tr>
+                                {% endif %}
                                 {% if book.title_en %}
                                 <tr>
                                     <td class="first">عنوان انگلیسی</td>
@@ -261,6 +258,18 @@
                                 {% endif %}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="nav-one" role="tabpanel" aria-labelledby="nav-one-tab">
+                <div class="row">
+                    <div class="desc-tab col-12 col-lg-10 mx-auto">
+                        {% if book.description %}
+                            <p style="white-space: pre-wrap; line-height: 2;">{{ book.description }}</p>
+                        {% else %}
+                            <p>توضیحی برای این کتاب ثبت نشده است.</p>
+                        {% endif %}
                     </div>
                 </div>
             </div>

@@ -48,6 +48,7 @@ class Book(Base):
     url = Column(String, unique=True, index=True)
     title = Column(String, index=True)
     title_en = Column(String)
+    slug = Column(String, unique=True, index=True, nullable=True)
     author = Column(String, index=True)
     publisher = Column(String, index=True)
     isbn = Column(String, index=True)
@@ -112,6 +113,52 @@ class Book(Base):
         ascii_clean = clean.encode("ascii", "ignore").decode("ascii").strip("._")
         return (ascii_clean or "book")[:180]
 
+    @staticmethod
+    def slugify_title(name: str | None, max_len: int = 80) -> str:
+        """SEO path segment from English title: The_World_of_Scary_Video."""
+        text = (name or "").strip()
+        text = re.sub(r"[^\w\s\-]+", "", text, flags=re.UNICODE)
+        text = re.sub(r"[\s\-]+", "_", text).strip("._")
+        ascii_text = text.encode("ascii", "ignore").decode("ascii").strip("._")
+        parts = [p for p in ascii_text.split("_") if p]
+        base = "_".join(parts)[:max_len].strip("_")
+        return base or "book"
+
+    @classmethod
+    def build_slug(
+        cls,
+        title_en: str | None,
+        title: str | None = None,
+        book_id: int | None = None,
+        unique_key: str | None = None,
+    ) -> str:
+        """Unique storefront slug from English title; append id (or key) for uniqueness."""
+        base = cls.slugify_title(title_en or title)
+        if book_id is not None:
+            return f"{base}_{int(book_id)}"
+        if unique_key:
+            suffix = hashlib.md5(unique_key.encode()).hexdigest()[:8]
+            return f"{base}_{suffix}"
+        return base
+
+    @property
+    def display_title(self) -> str:
+        """Listing / card title — English first (main catalog titles)."""
+        return (self.title_en or self.title or "بدون عنوان").strip() or "بدون عنوان"
+
+    @property
+    def seo_title_name(self) -> str:
+        return (self.title_en or self.title or "بدون عنوان").strip() or "بدون عنوان"
+
+    @property
+    def path(self) -> str:
+        """Public detail URL path (/book/The_World_…_42)."""
+        if self.slug:
+            return f"/book/{self.slug}"
+        if self.id:
+            return f"/book/{self.build_slug(self.title_en, self.title, book_id=self.id)}"
+        return f"/book/{self.id}" if self.id else "/search"
+
     @classmethod
     def build_stored_filename(
         cls,
@@ -173,6 +220,18 @@ class Book(Base):
             f'attachment; filename="{ascii_name}"; '
             f"filename*=UTF-8''{encoded}"
         )
+
+    def ensure_slug(self) -> str:
+        """Set slug from title_en/id if missing; return current slug."""
+        if self.slug:
+            return self.slug
+        self.slug = self.build_slug(self.title_en, self.title, book_id=self.id)
+        return self.slug
+
+    @property
+    def detail_path(self) -> str:
+        """Public book URL path (/book/The_World_…_42)."""
+        return self.path
 
     @property
     def pdf_filename(self) -> str:

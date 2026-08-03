@@ -132,6 +132,9 @@ def seed_books(session: Session, sqlite_path: Path) -> int:
         )
 
     session.add_all(books)
+    session.flush()
+    for book in books:
+        book.ensure_slug()
     session.commit()
     print(f"Seeded {len(books)} books from {sqlite_path.name}.")
     return len(books)

@@ -6609,12 +6609,27 @@ del {
     display: block;
 }
 
-.book-caption h3 {
+.book-caption h3,
+.book-caption h1.book-seo-heading {
     font-size: 1.35rem;
     font-weight: 900;
     margin-bottom: 16px;
     overflow-wrap: anywhere;
     word-break: break-word;
+    line-height: 1.5;
+}
+
+.book-caption .book-title-fa,
+.book-caption .book-title-en {
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #444;
+}
+
+.book-caption .book-title-en {
+    direction: ltr;
+    text-align: right;
+    font-size: 1.05rem;
 }
 
 .book-caption p a {

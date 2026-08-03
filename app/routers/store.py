@@ -1,5 +1,6 @@
 from math import ceil
 import json
+import re
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
@@ -167,17 +168,46 @@ async def _user_owns_book(db: AsyncSession, user_id: int, book_id: int) -> bool:
     return result.scalar_one_or_none() is not None
 
 
-@router.get("/book/{book_id}")
+@router.get("/book/{book_ref}")
 async def book_detail(
-    book_id: int,
+    book_ref: str,
     request: Request,
     db: AsyncSession = Depends(get_async_db),
     current_user: User | None = Depends(get_current_user_optional),
 ):
-    result = await db.execute(select(Book).where(Book.id == book_id))
-    book = result.scalar_one_or_none()
-    if not book:
-        raise HTTPException(status_code=404, detail="کتاب یافت نشد")
+    book = None
+    # Legacy numeric URLs → permanent redirect to English-name slug
+    if book_ref.isdigit():
+        result = await db.execute(select(Book).where(Book.id == int(book_ref)))
+        book = result.scalar_one_or_none()
+        if not book:
+            raise HTTPException(status_code=404, detail="کتاب یافت نشد")
+        book.ensure_slug()
+        await db.commit()
+        if book.slug and book.slug != book_ref:
+            return RedirectResponse(
+                url=book.path,
+                status_code=status.HTTP_301_MOVED_PERMANENTLY,
+            )
+    else:
+        result = await db.execute(select(Book).where(Book.slug == book_ref))
+        book = result.scalar_one_or_none()
+        if not book:
+            # Fallback: …_123 at end of path before slug column is filled
+            m = re.search(r"_(\d+)$", book_ref)
+            if m:
+                result = await db.execute(select(Book).where(Book.id == int(m.group(1))))
+                book = result.scalar_one_or_none()
+                if book:
+                    book.ensure_slug()
+                    await db.commit()
+                    if book.slug and book.slug != book_ref:
+                        return RedirectResponse(
+                            url=book.path,
+                            status_code=status.HTTP_301_MOVED_PERMANENTLY,
+                        )
+        if not book:
+            raise HTTPException(status_code=404, detail="کتاب یافت نشد")
 
     owned = False
     download_token = None

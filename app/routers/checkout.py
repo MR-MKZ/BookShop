@@ -656,7 +656,10 @@ async def buy_now(
         )
     ).scalar_one_or_none()
     if not book or not book.has_pdf:
-        return RedirectResponse(url=f"/book/{book_id}", status_code=status.HTTP_303_SEE_OTHER)
+        return RedirectResponse(
+            url=book.path if book else "/search",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
 
     if current_user and await _owns_book(db, current_user.id, book_id):
         return RedirectResponse(url="/profile", status_code=status.HTTP_303_SEE_OTHER)

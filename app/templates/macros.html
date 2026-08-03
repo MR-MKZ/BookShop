@@ -18,15 +18,15 @@
 <div class="properties pb-30">
     <div class="properties-card">
         <div class="properties-img">
-            <a href="/book/{{ book.id }}">
+            <a href="{{ book.path }}">
                 <img src="/media/proxy/cover/{{ book.folder_name }}/{{ book.cover_filename or 'cover.jpg' }}"
-                     alt="{{ book.title }}"
+                     alt="{{ book.display_title }}"
                      onerror="this.onerror=null;this.src='/static/img/book/default.png'"
                      loading="lazy">
             </a>
         </div>
         <div class="properties-caption properties-caption2">
-            <h3><a href="/book/{{ book.id }}" title="{{ book.title or 'بدون عنوان' }}">{{ book.title or 'بدون عنوان' }}</a></h3>
+            <h3><a href="{{ book.path }}" title="{{ book.display_title }}">{{ book.display_title }}</a></h3>
             <p>{{ book.author or 'نویسنده نامشخص' }}</p>
             <div class="properties-footer d-flex justify-content-between align-items-center">
                 {{ dual_price(book) }}

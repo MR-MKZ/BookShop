@@ -46,13 +46,13 @@
                         <tr class="cart-item-row">
                             <td>
                                 <div class="cart-product">
-                                    <a class="cart-product-cover" href="/book/{{ book.id }}">
+                                    <a class="cart-product-cover" href="{{ book.path }}">
                                         <img src="/media/proxy/cover/{{ book.folder_name }}/{{ book.cover_filename or 'cover.jpg' }}"
-                                             alt="{{ book.title }}"
+                                             alt="{{ book.display_title }}"
                                              onerror="this.onerror=null;this.src='/static/img/book/default.png'">
                                     </a>
                                     <div class="cart-product-meta">
-                                        <a href="/book/{{ book.id }}">{{ book.title }}</a>
+                                        <a href="{{ book.path }}">{{ book.display_title }}</a>
                                         {% if book.author %}<p>{{ book.author }}</p>{% endif %}
                                     </div>
                                 </div>

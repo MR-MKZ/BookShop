@@ -770,6 +770,7 @@ async def admin_book_create(
     folder_name = Book.storage_folder(book.id)
     book.folder_name = folder_name
     book.url = f"manual://{folder_name}"
+    book.ensure_slug()
 
     if cover and cover.filename:
         ext = _file_ext(cover.filename)
@@ -902,6 +903,7 @@ async def admin_book_save(
     book.price = price_val
     book.original_price = orig_val
     book.is_active = is_active is not None
+    book.slug = Book.build_slug(book.title_en, book.title, book_id=book.id)
 
     await db.commit()
     return RedirectResponse(

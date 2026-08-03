@@ -52,15 +52,15 @@
                         <div class="properties pb-30">
                             <div class="properties-card">
                                 <div class="properties-img">
-                                    <a href="/book/{{ item.book.id }}">
+                                    <a href="{{ item.book.path }}">
                                         <img src="/media/proxy/cover/{{ item.book.folder_name }}/{{ item.book.cover_filename or 'cover.jpg' }}"
-                                             alt="{{ item.book.title }}"
+                                             alt="{{ item.book.display_title }}"
                                              onerror="this.onerror=null;this.src='/static/img/book/default.png'"
                                              loading="lazy">
                                     </a>
                                 </div>
                                 <div class="properties-caption properties-caption2">
-                                    <h3><a href="/book/{{ item.book.id }}" title="{{ item.book.title or '' }}">{{ item.book.title or 'بدون عنوان' }}</a></h3>
+                                    <h3><a href="{{ item.book.path }}" title="{{ item.book.display_title }}">{{ item.book.display_title }}</a></h3>
                                     <p>{{ item.book.author or 'نویسنده نامشخص' }}</p>
                                     <div class="properties-footer">
                                         {% if item.token %}

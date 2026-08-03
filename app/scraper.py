@@ -87,6 +87,7 @@ class BookScraper:
                         url VARCHAR UNIQUE,
                         title VARCHAR,
                         title_en VARCHAR,
+                        slug VARCHAR UNIQUE,
                         author VARCHAR,
                         publisher VARCHAR,
                         isbn VARCHAR,
@@ -109,6 +110,12 @@ class BookScraper:
                         created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
                         updated_at TIMESTAMP WITH TIME ZONE
                     );
+                """)
+                await conn.execute("""
+                    ALTER TABLE books ADD COLUMN IF NOT EXISTS slug VARCHAR;
+                """)
+                await conn.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS ix_books_slug ON books (slug);
                 """)
                 await conn.execute("""
                     DO $$ BEGIN
@@ -144,12 +151,18 @@ class BookScraper:
             parts.append("update")
         if self.args.turbo:
             parts.append("turbo")
+        if getattr(self.args, "content_dedup", False):
+            parts.append("content-dedup")
         start = self.args.start_page
         end = self.args.end_page or (self.args.start_page + pages_total - 1)
         parts.append(f"pages={start}-{end}")
         parts.append(f"workers={self.args.workers}")
         parts.append(f"concurrency={self.args.concurrency}")
         return " ".join(parts)
+
+    @property
+    def content_dedup_enabled(self) -> bool:
+        return bool(getattr(self.args, "content_dedup", False))
 
     async def start_run(self, pages_total: int):
         self.pages_total = pages_total
@@ -479,32 +492,47 @@ class BookScraper:
         return result
 
     async def load_known_content_keys(self):
-        """Preload ISBN / title fingerprints so we skip asbook duplicates."""
+        """Preload known URLs (always) and optional content fingerprints."""
+        if self.content_dedup_enabled:
+            async with self.db_pool.acquire() as conn:
+                rows = await conn.fetch(
+                    """
+                    SELECT url, title, title_en, author, isbn, publisher, publish_year
+                    FROM books
+                    """
+                )
+            for row in rows:
+                if row["url"]:
+                    self.known_urls.add(row["url"])
+                key = self.content_key(
+                    row["title"],
+                    row["title_en"],
+                    row["author"],
+                    row["isbn"],
+                    row["publisher"],
+                    row["publish_year"],
+                )
+                if key:
+                    self.known_content_keys.add(key)
+            logger.info(
+                "Loaded %s URLs and %s content keys (content-dedup ON)",
+                len(self.known_urls),
+                len(self.known_content_keys),
+            )
+            return
+
         async with self.db_pool.acquire() as conn:
-            rows = await conn.fetch(
-                """
-                SELECT url, title, title_en, author, isbn, publisher, publish_year
-                FROM books
-                """
-            )
+            rows = await conn.fetch("SELECT url FROM books WHERE url IS NOT NULL")
         for row in rows:
-            if row["url"]:
-                self.known_urls.add(row["url"])
-            key = self.content_key(
-                row["title"],
-                row["title_en"],
-                row["author"],
-                row["isbn"],
-                row["publisher"],
-                row["publish_year"],
-            )
-            if key:
-                self.known_content_keys.add(key)
+            self.known_urls.add(row["url"])
         logger.info(
-            f"Loaded {len(self.known_urls)} URLs and {len(self.known_content_keys)} content keys"
+            "Loaded %s URLs (content-dedup OFF — skip only by exact URL)",
+            len(self.known_urls),
         )
 
     async def is_content_duplicate(self, data: dict) -> bool:
+        if not self.content_dedup_enabled:
+            return False
         key = self.content_key(
             data.get("title_fa"),
             data.get("title_en"),
@@ -716,18 +744,19 @@ class BookScraper:
                             if not (author or "").strip():
                                 author = listing.get("author", "") or author
 
-                    preview = {
-                        "title_fa": title,
-                        "title_en": title_en,
-                        "author": author,
-                        "isbn": isbn,
-                        "publisher": publisher,
-                        "year": year,
-                    }
-                    if await self.is_content_duplicate(preview):
-                        self.books_skipped += 1
-                        logger.info(f"Skipped duplicate content: {title[:80]}")
-                        continue
+                    if self.content_dedup_enabled:
+                        preview = {
+                            "title_fa": title,
+                            "title_en": title_en,
+                            "author": author,
+                            "isbn": isbn,
+                            "publisher": publisher,
+                            "year": year,
+                        }
+                        if await self.is_content_duplicate(preview):
+                            self.books_skipped += 1
+                            logger.info(f"Skipped duplicate content: {title[:80]}")
+                            continue
 
                     folder_name = Book.storage_folder_from_isbn_or_url(isbn, url)
 
@@ -764,12 +793,13 @@ class BookScraper:
                         "cover_filename": cover_filename,
                     }
 
-                    # Reserve key before queueing to reduce concurrent dupes
-                    key = self.content_key(
-                        title, title_en, author, isbn, publisher, year
-                    )
-                    if key:
-                        self.known_content_keys.add(key)
+                    # Reserve content key only when fingerprint dedup is enabled
+                    if self.content_dedup_enabled:
+                        key = self.content_key(
+                            title, title_en, author, isbn, publisher, year
+                        )
+                        if key:
+                            self.known_content_keys.add(key)
                     self.known_urls.add(url)
 
                     await self.db_queue.put(data)
@@ -817,23 +847,31 @@ class BookScraper:
 
     async def save_batch(self, batch):
         try:
-            # Drop content duplicates inside the batch itself
+            # Drop in-batch duplicates: by content fingerprint (optional) or URL only
             unique = []
             seen_keys: set[str] = set()
+            seen_urls: set[str] = set()
             for d in batch:
-                key = self.content_key(
-                    d.get("title_fa"),
-                    d.get("title_en"),
-                    d.get("author"),
-                    d.get("isbn"),
-                    d.get("publisher"),
-                    d.get("year"),
-                )
-                if key and key in seen_keys:
+                url = d.get("url") or ""
+                if url and url in seen_urls:
                     self.books_skipped += 1
                     continue
-                if key:
-                    seen_keys.add(key)
+                if self.content_dedup_enabled:
+                    key = self.content_key(
+                        d.get("title_fa"),
+                        d.get("title_en"),
+                        d.get("author"),
+                        d.get("isbn"),
+                        d.get("publisher"),
+                        d.get("year"),
+                    )
+                    if key and key in seen_keys:
+                        self.books_skipped += 1
+                        continue
+                    if key:
+                        seen_keys.add(key)
+                if url:
+                    seen_urls.add(url)
                 unique.append(d)
 
             async with self.db_pool.acquire() as conn:
@@ -874,6 +912,26 @@ class BookScraper:
                         for d in unique
                     ],
                 )
+                # Fill SEO slugs for newly inserted rows (English title + id)
+                urls = [d["url"] for d in unique if d.get("url")]
+                if urls:
+                    rows = await conn.fetch(
+                        """
+                        SELECT id, title, title_en FROM books
+                        WHERE url = ANY($1::text[])
+                          AND (slug IS NULL OR slug = '')
+                        """,
+                        urls,
+                    )
+                    for row in rows:
+                        slug = Book.build_slug(
+                            row["title_en"], row["title"], book_id=row["id"]
+                        )
+                        await conn.execute(
+                            "UPDATE books SET slug = $1 WHERE id = $2 AND (slug IS NULL OR slug = '')",
+                            slug,
+                            row["id"],
+                        )
                 self.books_saved += len(unique)
                 logger.info(
                     "DB: flushed %s books (running total=%s)",
@@ -988,6 +1046,16 @@ if __name__ == "__main__":
         "--update",
         action="store_true",
         help="Smart update: stop when a listing page has only known books",
+    )
+    parser.add_argument(
+        "--content-dedup",
+        action="store_true",
+        default=False,
+        help=(
+            "Skip books that match an existing title/ISBN/publisher fingerprint. "
+            "Off by default: only exact asbook URL is skipped so every listing "
+            "(e.g. magazine issues) is saved."
+        ),
     )
     parser.add_argument(
         "--loop",
