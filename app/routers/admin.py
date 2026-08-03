@@ -21,7 +21,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import and_, cast, desc, func, or_, select, String
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -1021,8 +1021,46 @@ def _safe_admin_redirect(next_url: str | None, fallback: str) -> str:
     return fallback
 
 
+def _wants_json(request: Request) -> bool:
+    accept = (request.headers.get("accept") or "").lower()
+    return "application/json" in accept
+
+
+def _book_quick_file_payload(book: Book, *, ttl_hours: int) -> dict:
+    return {
+        "ok": True,
+        "id": book.id,
+        "title": book.display_title,
+        "has_file_ready": book.has_file_ready,
+        "has_upload": bool(book.file_filename),
+        "has_external": bool((book.external_file_url or "").strip()),
+        "external_url": (book.external_file_url or "").strip(),
+        "file_format": book.file_format or "",
+        "file_filename": book.file_filename or "",
+        "file_size": book.file_size or "",
+        "ttl_hours": ttl_hours,
+        "allowed_exts": sorted(ALLOWED_BOOK_EXTS),
+    }
+
+
+@router.get("/books/{book_id}/quick-file")
+async def admin_book_quick_file(
+    book_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    book = (
+        await db.execute(select(Book).where(Book.id == book_id))
+    ).scalar_one_or_none()
+    if not book:
+        raise HTTPException(status_code=404, detail="کتاب یافت نشد")
+    ttl_hours = await get_download_ttl_hours(db)
+    return JSONResponse(_book_quick_file_payload(book, ttl_hours=ttl_hours))
+
+
 @router.post("/books/{book_id}/upload")
 async def admin_upload_file(
+    request: Request,
     book_id: int,
     file: UploadFile = File(...),
     next: str = Form(""),
@@ -1037,13 +1075,15 @@ async def admin_upload_file(
 
     ext = _file_ext(file.filename)
     if ext not in ALLOWED_BOOK_EXTS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"فرمت مجاز نیست. مجاز: {', '.join(sorted(ALLOWED_BOOK_EXTS))}",
-        )
+        detail = f"فرمت مجاز نیست. مجاز: {', '.join(sorted(ALLOWED_BOOK_EXTS))}"
+        if _wants_json(request):
+            return JSONResponse({"ok": False, "error": detail}, status_code=400)
+        raise HTTPException(status_code=400, detail=detail)
 
     data = await file.read()
     if not data:
+        if _wants_json(request):
+            return JSONResponse({"ok": False, "error": "فایل خالی است"}, status_code=400)
         raise HTTPException(status_code=400, detail="فایل خالی است")
 
     if not book.id:
@@ -1061,15 +1101,24 @@ async def admin_upload_file(
     try:
         await _upload_book_file(folder_name, filename, data)
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"خطا در آپلود فایل: {e}",
-        ) from e
+        detail = f"خطا در آپلود فایل: {e}"
+        if _wants_json(request):
+            return JSONResponse({"ok": False, "error": detail}, status_code=500)
+        raise HTTPException(status_code=500, detail=detail) from e
     book.file_format = ext
     book.file_filename = filename
     book.file_size = f"{len(data) // 1024} KB"
     book.sync_has_pdf()
     await db.commit()
+
+    if _wants_json(request):
+        ttl_hours = await get_download_ttl_hours(db)
+        return JSONResponse(
+            {
+                **_book_quick_file_payload(book, ttl_hours=ttl_hours),
+                "message": "فایل با موفقیت آپلود شد.",
+            }
+        )
 
     # List uploads stay on the list; edit-page uploads return to edit
     fallback = f"/admin/books/{book.id}?msg=uploaded"
@@ -1116,6 +1165,7 @@ async def admin_delete_file(
 
 @router.post("/books/{book_id}/external-url")
 async def admin_set_external_url(
+    request: Request,
     book_id: int,
     external_url: str = Form(""),
     db: AsyncSession = Depends(get_async_db),
@@ -1129,6 +1179,11 @@ async def admin_set_external_url(
 
     url = (external_url or "").strip()
     if url and not (url.startswith("http://") or url.startswith("https://")):
+        if _wants_json(request):
+            return JSONResponse(
+                {"ok": False, "error": "آدرس باید با http:// یا https:// شروع شود."},
+                status_code=400,
+            )
         return RedirectResponse(
             url=f"/admin/books/{book.id}?msg=bad_external_url",
             status_code=status.HTTP_303_SEE_OTHER,
@@ -1145,6 +1200,14 @@ async def admin_set_external_url(
             book.file_format = "bin"
     book.sync_has_pdf()
     await db.commit()
+    if _wants_json(request):
+        ttl_hours = await get_download_ttl_hours(db)
+        return JSONResponse(
+            {
+                **_book_quick_file_payload(book, ttl_hours=ttl_hours),
+                "message": "لینک خارجی ذخیره شد.",
+            }
+        )
     return RedirectResponse(
         url=f"/admin/books/{book.id}?msg=external_saved",
         status_code=status.HTTP_303_SEE_OTHER,
@@ -1153,6 +1216,7 @@ async def admin_set_external_url(
 
 @router.post("/books/{book_id}/external-url/delete")
 async def admin_clear_external_url(
+    request: Request,
     book_id: int,
     db: AsyncSession = Depends(get_async_db),
     admin: User = Depends(require_admin),
@@ -1165,6 +1229,14 @@ async def admin_clear_external_url(
     book.external_file_url = None
     book.sync_has_pdf()
     await db.commit()
+    if _wants_json(request):
+        ttl_hours = await get_download_ttl_hours(db)
+        return JSONResponse(
+            {
+                **_book_quick_file_payload(book, ttl_hours=ttl_hours),
+                "message": "لینک خارجی پاک شد.",
+            }
+        )
     return RedirectResponse(
         url=f"/admin/books/{book.id}?msg=external_cleared",
         status_code=status.HTTP_303_SEE_OTHER,
@@ -1173,6 +1245,7 @@ async def admin_clear_external_url(
 
 @router.post("/books/{book_id}/secure-link")
 async def admin_create_secure_link(
+    request: Request,
     book_id: int,
     note: str = Form(""),
     db: AsyncSession = Depends(get_async_db),
@@ -1184,6 +1257,14 @@ async def admin_create_secure_link(
     if not book:
         raise HTTPException(status_code=404)
     if not book.has_file_ready:
+        if _wants_json(request):
+            return JSONResponse(
+                {
+                    "ok": False,
+                    "error": "برای ساخت لینک امن ابتدا فایل آپلود کنید یا لینک خارجی ثبت کنید.",
+                },
+                status_code=400,
+            )
         return RedirectResponse(
             url=f"/admin/books/{book.id}?msg=no_file_for_link",
             status_code=status.HTTP_303_SEE_OTHER,
@@ -1199,6 +1280,16 @@ async def admin_create_secure_link(
     base = (settings.BASE_URL or "").rstrip("/")
     full = f"{base}{path}" if base else path
     from urllib.parse import quote
+
+    if _wants_json(request):
+        return JSONResponse(
+            {
+                **_book_quick_file_payload(book, ttl_hours=ttl_hours),
+                "message": "لینک امن ساخته شد.",
+                "secure_url": full,
+                "link_id": link.id,
+            }
+        )
 
     return RedirectResponse(
         url=f"/admin/books/{book.id}?msg=link_created&link={quote(full, safe='')}",

@@ -52,7 +52,7 @@
     </thead>
     <tbody>
         {% for book in books %}
-        <tr{% if uploaded_id and uploaded_id|string == book.id|string %} style="background:#f0fdf4;"{% endif %}>
+        <tr data-book-row="{{ book.id }}"{% if uploaded_id and uploaded_id|string == book.id|string %} style="background:#f0fdf4;"{% endif %}>
             <td>{{ book.id }}</td>
             <td>
                 {{ book.title }}
@@ -60,9 +60,9 @@
             </td>
             <td>{{ book.author or '—' }}</td>
             <td dir="ltr">{{ "{:,.0f}".format(book.price|float) if book.price else 0 }}</td>
-            <td>
-                {% if book.has_pdf %}
-                    <span class="badge badge-ok">{{ book.file_format or 'pdf' }}</span>
+            <td class="file-cell">
+                {% if book.has_file_ready %}
+                    <span class="badge badge-ok">{{ book.file_format or 'فایل' }}</span>
                 {% else %}
                     <span class="badge badge-no">ندارد</span>
                 {% endif %}
@@ -70,9 +70,9 @@
             <td>{% if book.is_active %}<span class="badge badge-ok">فعال</span>{% else %}<span class="badge badge-muted">غیرفعال</span>{% endif %}</td>
             <td>
                 <div class="btn-row btn-row-sm">
-                    <a class="btn btn-sm" href="/admin/books/{{ book.id }}">ویرایش</a>
-                    {% if not book.has_pdf %}
-                    <a class="btn btn-sm btn-secondary" href="/admin/books/{{ book.id }}#file-source">آپلود فایل</a>
+                    <a class="btn btn-sm btn-secondary" href="/admin/books/{{ book.id }}">ویرایش</a>
+                    {% if not book.has_file_ready %}
+                    <button type="button" class="btn btn-sm js-quick-file" data-book-id="{{ book.id }}">فایل سریع</button>
                     {% endif %}
                 </div>
             </td>
@@ -90,4 +90,246 @@
     </div>
 </div>
 {% endif %}
+
+<div class="admin-modal-root" id="quick-file-modal" aria-hidden="true">
+    <div class="admin-modal-backdrop" data-close-modal></div>
+    <div class="admin-modal" role="dialog" aria-modal="true" aria-labelledby="qf-title">
+        <div class="admin-modal-head">
+            <div>
+                <h2 id="qf-title">مدیریت فایل</h2>
+                <p class="modal-sub" id="qf-sub">—</p>
+            </div>
+            <button type="button" class="admin-modal-close" data-close-modal aria-label="بستن">×</button>
+        </div>
+        <div class="modal-msg" id="qf-msg"></div>
+        <p class="modal-status" id="qf-status">در حال بارگذاری…</p>
+
+        <div class="modal-block">
+            <h3>آپلود فایل</h3>
+            <form id="qf-upload-form">
+                <input type="file" name="file" id="qf-file" required>
+                <p class="form-hint" id="qf-exts"></p>
+                <div class="btn-row btn-row-sm" style="margin-top:8px;">
+                    <button class="btn btn-sm" type="submit" id="qf-upload-btn">آپلود</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="modal-block">
+            <h3>لینک مستقیم خارجی</h3>
+            <form id="qf-external-form">
+                <input type="url" name="external_url" id="qf-external" dir="ltr" placeholder="https://…">
+                <p class="form-hint">برای مشتری نمایش داده نمی‌شود؛ از طریق پروکسی امن سرو می‌شود.</p>
+                <div class="btn-row btn-row-sm" style="margin-top:8px;">
+                    <button class="btn btn-sm" type="submit">ذخیره لینک</button>
+                    <button class="btn btn-sm btn-danger" type="button" id="qf-external-clear">حذف لینک</button>
+                </div>
+            </form>
+        </div>
+
+        <div class="modal-block">
+            <h3>لینک دانلود امن</h3>
+            <form id="qf-secure-form">
+                <input type="text" name="note" id="qf-note" placeholder="یادداشت اختیاری">
+                <p class="form-hint" id="qf-ttl">اعتبار پیش‌فرض اعمال می‌شود.</p>
+                <div class="btn-row btn-row-sm" style="margin-top:8px;">
+                    <button class="btn btn-sm" type="submit" id="qf-secure-btn">ساخت لینک امن</button>
+                </div>
+            </form>
+            <div class="secure-out" id="qf-secure-out">
+                <div class="dl-link-cell">
+                    <input type="text" readonly dir="ltr" id="qf-secure-url">
+                    <button class="btn btn-sm btn-secondary" type="button" id="qf-secure-copy">کپی</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var modal = document.getElementById('quick-file-modal');
+    if (!modal) return;
+    var bookId = null;
+    var msgEl = document.getElementById('qf-msg');
+    var statusEl = document.getElementById('qf-status');
+    var subEl = document.getElementById('qf-sub');
+    var fileInput = document.getElementById('qf-file');
+    var extEl = document.getElementById('qf-exts');
+    var externalInput = document.getElementById('qf-external');
+    var ttlEl = document.getElementById('qf-ttl');
+    var secureBtn = document.getElementById('qf-secure-btn');
+    var secureOut = document.getElementById('qf-secure-out');
+    var secureUrl = document.getElementById('qf-secure-url');
+
+    function jsonHeaders() {
+        return { 'Accept': 'application/json' };
+    }
+
+    function showMsg(text, ok) {
+        msgEl.textContent = text || '';
+        msgEl.className = 'modal-msg' + (text ? (ok ? ' is-ok' : ' is-err') : '');
+    }
+
+    function applyState(data) {
+        if (!data) return;
+        subEl.textContent = '#' + data.id + ' — ' + (data.title || '');
+        var parts = [];
+        if (data.has_upload) parts.push('آپلود' + (data.file_format ? ' (' + data.file_format + ')' : ''));
+        if (data.has_external) parts.push('لینک خارجی');
+        statusEl.textContent = parts.length
+            ? ('وضعیت: ' + parts.join(' + '))
+            : 'وضعیت: فایل آماده نیست';
+        externalInput.value = data.external_url || '';
+        ttlEl.textContent = 'اعتبار لینک امن: ' + (data.ttl_hours || '?') + ' ساعت';
+        if (data.allowed_exts && data.allowed_exts.length) {
+            extEl.textContent = 'فرمت‌های مجاز: ' + data.allowed_exts.join(', ');
+            fileInput.setAttribute('accept', '.' + data.allowed_exts.join(',.'));
+        }
+        secureBtn.disabled = !data.has_file_ready;
+        updateRowFileBadge(data);
+    }
+
+    function updateRowFileBadge(data) {
+        var row = document.querySelector('[data-book-row="' + data.id + '"]');
+        if (!row) return;
+        var cell = row.querySelector('.file-cell');
+        if (!cell) return;
+        if (data.has_file_ready) {
+            cell.innerHTML = '<span class="badge badge-ok">' + (data.file_format || 'فایل') + '</span>';
+            var btn = row.querySelector('.js-quick-file');
+            if (btn) btn.remove();
+        } else {
+            cell.innerHTML = '<span class="badge badge-no">ندارد</span>';
+        }
+    }
+
+    function openModal(id) {
+        bookId = id;
+        showMsg('', true);
+        secureOut.classList.remove('is-on');
+        secureUrl.value = '';
+        fileInput.value = '';
+        document.getElementById('qf-note').value = '';
+        statusEl.textContent = 'در حال بارگذاری…';
+        subEl.textContent = 'کتاب #' + id;
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
+        fetch('/admin/books/' + id + '/quick-file', { headers: jsonHeaders(), credentials: 'same-origin' })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (res) {
+                if (!res.ok) throw new Error((res.j && (res.j.error || res.j.detail)) || 'خطا در بارگذاری');
+                applyState(res.j);
+            })
+            .catch(function (err) {
+                showMsg(err.message || 'خطا', false);
+            });
+    }
+
+    function closeModal() {
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('modal-open');
+        bookId = null;
+    }
+
+    function postForm(url, formData) {
+        return fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: jsonHeaders(),
+            credentials: 'same-origin'
+        }).then(function (r) {
+            return r.json().then(function (j) {
+                return { ok: r.ok, status: r.status, j: j };
+            });
+        });
+    }
+
+    document.querySelectorAll('.js-quick-file').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            openModal(btn.getAttribute('data-book-id'));
+        });
+    });
+
+    modal.querySelectorAll('[data-close-modal]').forEach(function (el) {
+        el.addEventListener('click', closeModal);
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && modal.classList.contains('is-open')) closeModal();
+    });
+
+    document.getElementById('qf-upload-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!bookId || !fileInput.files || !fileInput.files[0]) return;
+        var fd = new FormData();
+        fd.append('file', fileInput.files[0]);
+        var btn = document.getElementById('qf-upload-btn');
+        btn.disabled = true;
+        showMsg('', true);
+        postForm('/admin/books/' + bookId + '/upload', fd)
+            .then(function (res) {
+                if (!res.ok || res.j.ok === false) throw new Error(res.j.error || res.j.detail || 'آپلود ناموفق');
+                applyState(res.j);
+                showMsg(res.j.message || 'آپلود شد.', true);
+                fileInput.value = '';
+            })
+            .catch(function (err) { showMsg(err.message || 'خطا', false); })
+            .finally(function () { btn.disabled = false; });
+    });
+
+    document.getElementById('qf-external-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!bookId) return;
+        var fd = new FormData();
+        fd.append('external_url', externalInput.value || '');
+        showMsg('', true);
+        postForm('/admin/books/' + bookId + '/external-url', fd)
+            .then(function (res) {
+                if (!res.ok || res.j.ok === false) throw new Error(res.j.error || res.j.detail || 'ذخیره ناموفق');
+                applyState(res.j);
+                showMsg(res.j.message || 'ذخیره شد.', true);
+            })
+            .catch(function (err) { showMsg(err.message || 'خطا', false); });
+    });
+
+    document.getElementById('qf-external-clear').addEventListener('click', function () {
+        if (!bookId) return;
+        showMsg('', true);
+        postForm('/admin/books/' + bookId + '/external-url/delete', new FormData())
+            .then(function (res) {
+                if (!res.ok || res.j.ok === false) throw new Error(res.j.error || res.j.detail || 'حذف ناموفق');
+                applyState(res.j);
+                showMsg(res.j.message || 'لینک پاک شد.', true);
+            })
+            .catch(function (err) { showMsg(err.message || 'خطا', false); });
+    });
+
+    document.getElementById('qf-secure-form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (!bookId) return;
+        var fd = new FormData();
+        fd.append('note', document.getElementById('qf-note').value || '');
+        showMsg('', true);
+        postForm('/admin/books/' + bookId + '/secure-link', fd)
+            .then(function (res) {
+                if (!res.ok || res.j.ok === false) throw new Error(res.j.error || res.j.detail || 'ساخت لینک ناموفق');
+                applyState(res.j);
+                showMsg(res.j.message || 'لینک ساخته شد.', true);
+                if (res.j.secure_url) {
+                    secureUrl.value = res.j.secure_url;
+                    secureOut.classList.add('is-on');
+                }
+            })
+            .catch(function (err) { showMsg(err.message || 'خطا', false); });
+    });
+
+    document.getElementById('qf-secure-copy').addEventListener('click', function () {
+        if (!secureUrl.value) return;
+        navigator.clipboard.writeText(secureUrl.value);
+        showMsg('لینک کپی شد.', true);
+    });
+})();
+</script>
 {% endblock %}

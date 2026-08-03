@@ -326,9 +326,25 @@
         .btn-danger { background: #dc2626; }
         .btn-sm {
             min-height: 32px;
+            min-width: 72px;
             padding: 5px 12px;
             font-size: .8rem;
             border-radius: 7px;
+        }
+        table .btn-row,
+        td .btn-row {
+            flex-wrap: nowrap;
+            gap: 6px;
+        }
+        table .btn-sm,
+        td .btn-sm {
+            min-height: 32px;
+            height: 32px;
+            min-width: 78px;
+            padding: 0 12px;
+            font-size: .8rem;
+            line-height: 1;
+            box-sizing: border-box;
         }
         .btn-row {
             display: flex;
@@ -349,8 +365,12 @@
         .btn-row.btn-row-sm > button.btn,
         .btn-row.btn-row-sm form .btn {
             min-height: 32px;
-            padding: 5px 12px;
+            height: 32px;
+            min-width: 78px;
+            padding: 0 12px;
             font-size: .8rem;
+            line-height: 1;
+            box-sizing: border-box;
         }
         .btn-row form { display: inline-flex; margin: 0; }
 
@@ -386,6 +406,10 @@
             background-repeat: no-repeat;
             background-position: left 12px center;
             padding-left: 32px;
+            padding-right: 12px;
+            height: 42px;
+            min-height: 42px;
+            line-height: 1.2;
         }
         input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
         select:focus,
@@ -429,16 +453,12 @@
             box-shadow: 0 1px 3px rgba(0,0,0,.06);
             box-sizing: border-box;
         }
-        .admin-form .form-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 14px 16px;
-        }
         .admin-form .form-field {
             display: flex;
             flex-direction: column;
             gap: 6px;
             margin: 0;
+            min-width: 0;
         }
         .admin-form .form-field.full { grid-column: 1 / -1; }
         .admin-form label,
@@ -709,6 +729,127 @@
         .chart-wrap { position: relative; height: 280px; }
         .chart-wrap-bar { height: 340px; }
 
+        /* Quick file modal */
+        .admin-modal-root {
+            position: fixed;
+            inset: 0;
+            z-index: 80;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .admin-modal-root.is-open { display: flex; }
+        .admin-modal-backdrop {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, .55);
+        }
+        .admin-modal {
+            position: relative;
+            z-index: 1;
+            width: min(560px, 100%);
+            max-height: min(90vh, 720px);
+            overflow: auto;
+            background: #fff;
+            border-radius: 14px;
+            box-shadow: 0 20px 50px rgba(15, 23, 42, .28);
+            padding: 18px 18px 16px;
+        }
+        .admin-modal-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .admin-modal-head h2 {
+            margin: 0;
+            font-size: 1.05rem;
+            line-height: 1.35;
+        }
+        .admin-modal-head .modal-sub {
+            margin: 4px 0 0;
+            color: #64748b;
+            font-size: .82rem;
+        }
+        .admin-modal-close {
+            border: 0;
+            background: #e2e8f0;
+            color: #334155;
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.1rem;
+            line-height: 1;
+            flex: 0 0 auto;
+        }
+        .admin-modal-close:hover { background: #cbd5e1; }
+        .admin-modal .modal-block {
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
+            background: #f8fafc;
+        }
+        .admin-modal .modal-block h3 {
+            margin: 0 0 8px;
+            font-size: .92rem;
+        }
+        .admin-modal .modal-status {
+            margin: 0 0 10px;
+            font-size: .85rem;
+            color: #475569;
+        }
+        .admin-modal .modal-msg {
+            display: none;
+            margin: 0 0 10px;
+            padding: 8px 10px;
+            border-radius: 8px;
+            font-size: .85rem;
+        }
+        .admin-modal .modal-msg.is-ok {
+            display: block;
+            background: #dcfce7;
+            color: #166534;
+        }
+        .admin-modal .modal-msg.is-err {
+            display: block;
+            background: #fef2f2;
+            color: #991b1b;
+        }
+        .admin-modal .secure-out {
+            display: none;
+            margin-top: 8px;
+        }
+        .admin-modal .secure-out.is-on { display: block; }
+        body.modal-open { overflow: hidden; }
+
+        .sidebar a {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .nav-ico {
+            width: 18px;
+            height: 18px;
+            flex: 0 0 auto;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            opacity: .9;
+        }
+        .nav-ico svg {
+            width: 18px;
+            height: 18px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
         /* Mobile top bar — hidden on desktop */
         .mobile-bar {
             display: none;
@@ -945,11 +1086,15 @@
                 flex: 0 0 auto;
                 width: auto;
             }
-            .dl-link-cell {
-                flex-direction: column;
-                align-items: stretch;
+            table .btn-row,
+            td .btn-row {
+                flex-wrap: wrap;
             }
-            .dl-link-cell .btn { width: 100%; }
+            .admin-modal {
+                width: 100%;
+                max-height: min(92vh, 100%);
+                padding: 14px;
+            }
             .category-checks {
                 gap: 8px 12px;
             }
@@ -1010,26 +1155,62 @@
         <div class="brand">لامابوک ادمین</div>
         <nav class="sidebar-nav">
             <div class="nav-section">کلی</div>
-            <a href="/admin/" class="{% if request.url.path == '/admin/' %}active{% endif %}">داشبورد</a>
+            <a href="/admin/" class="{% if request.url.path == '/admin/' %}active{% endif %}">
+                <span class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10.5V20h13v-9.5"/></svg></span>
+                داشبورد
+            </a>
 
             <div class="nav-section">کاتالوگ</div>
-            <a href="/admin/books" class="{% if request.url.path.startswith('/admin/books') %}active{% endif %}">کتاب‌ها</a>
-            <a href="/admin/categories" class="{% if '/admin/categories' in request.url.path %}active{% endif %}">دسته‌بندی‌ها</a>
-            <a href="/admin/download-links" class="{% if '/admin/download-links' in request.url.path %}active{% endif %}">لینک‌های دانلود</a>
+            <a href="/admin/books" class="{% if request.url.path.startswith('/admin/books') %}active{% endif %}">
+                <span class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v18H6.5A2.5 2.5 0 0 0 4 23.5Z"/><path d="M4 5.5V20"/></svg></span>
+                کتاب‌ها
+            </a>
+            <a href="/admin/categories" class="{% if '/admin/categories' in request.url.path %}active{% endif %}">
+                <span class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h10"/></svg></span>
+                دسته‌بندی‌ها
+            </a>
+            <a href="/admin/download-links" class="{% if '/admin/download-links' in request.url.path %}active{% endif %}">
+                <span class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4v10"/><path d="m8 10 4 4 4-4"/><path d="M5 19h14"/></svg></span>
+                لینک‌های دانلود
+            </a>
 
             <div class="nav-section">فروش</div>
-            <a href="/admin/orders" class="{% if '/admin/orders' in request.url.path %}active{% endif %}">سفارش‌ها</a>
-            <a href="/admin/users" class="{% if '/admin/users' in request.url.path %}active{% endif %}">کاربران</a>
-            <a href="/admin/coupons" class="{% if '/admin/coupons' in request.url.path or '/admin/settings' in request.url.path %}active{% endif %}">تخفیف و تنظیمات</a>
-            <a href="/admin/reports" class="{% if '/admin/reports' in request.url.path %}active{% endif %}">گزارش‌ها</a>
+            <a href="/admin/orders" class="{% if '/admin/orders' in request.url.path %}active{% endif %}">
+                <span class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6 7h12l1 12H5L6 7Z"/><path d="M9 7a3 3 0 0 1 6 0"/></svg></span>
+                سفارش‌ها
+            </a>
+            <a href="/admin/users" class="{% if '/admin/users' in request.url.path %}active{% endif %}">
+                <span class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 19.5c1.5-3.2 4-4.5 7-4.5s5.5 1.3 7 4.5"/></svg></span>
+                کاربران
+            </a>
+            <a href="/admin/coupons" class="{% if '/admin/coupons' in request.url.path or '/admin/settings' in request.url.path %}active{% endif %}">
+                <span class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 9V6h16v3a2.5 2.5 0 0 0 0 5v3H4v-3a2.5 2.5 0 0 0 0-5Z"/><path d="M9 12h.01"/></svg></span>
+                تخفیف و تنظیمات
+            </a>
+            <a href="/admin/reports" class="{% if '/admin/reports' in request.url.path %}active{% endif %}">
+                <span class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19h16"/><path d="M7 16V9"/><path d="M12 16V5"/><path d="M17 16v-6"/></svg></span>
+                گزارش‌ها
+            </a>
 
             <div class="nav-section">محتوا و سیستم</div>
-            <a href="/admin/hero" class="{% if '/admin/hero' in request.url.path %}active{% endif %}">کاور صفحه اصلی</a>
-            <a href="/admin/scraper" class="{% if '/admin/scraper' in request.url.path %}active{% endif %}">اسکرپر</a>
+            <a href="/admin/hero" class="{% if '/admin/hero' in request.url.path %}active{% endif %}">
+                <span class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="m21 16-4.5-4.5L8 20"/></svg></span>
+                کاور صفحه اصلی
+            </a>
+            <a href="/admin/scraper" class="{% if '/admin/scraper' in request.url.path %}active{% endif %}">
+                <span class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 14-5.3"/><path d="M20 12a8 8 0 0 1-14 5.3"/><path d="M18 4v4h-4"/><path d="M6 20v-4h4"/></svg></span>
+                اسکرپر
+            </a>
 
             <div class="nav-footer">
-                <a href="/" target="_blank" rel="noopener">مشاهده سایت</a>
-                <a href="/auth/logout">خروج</a>
+                <a href="/" target="_blank" rel="noopener">
+                    <span class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M10 14 20 4"/><path d="M20 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5"/></svg></span>
+                    مشاهده سایت
+                </a>
+                <a href="/auth/logout">
+                    <span class="nav-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 4H5a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h5"/><path d="M16 12H8"/><path d="m13 8 4 4-4 4"/></svg></span>
+                    خروج
+                </a>
             </div>
         </nav>
     </aside>
