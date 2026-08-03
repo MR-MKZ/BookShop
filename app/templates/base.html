@@ -99,7 +99,7 @@
     <link rel="stylesheet" href="/static/css/themify-icons.css">
     <link rel="stylesheet" href="/static/css/slick.css">
     <link rel="stylesheet" href="/static/css/nice-select.css">
-    <link rel="stylesheet" href="/static/css/style.css?v=bookcards7">
+    <link rel="stylesheet" href="/static/css/style.css?v=bookcards9">
     <style>
         /* Fix theme scroll jank (html overflow:scroll + zero-width scrollbar) */
         html {
@@ -263,6 +263,7 @@
             width: 100%;
             height: 100%;
             background: #fff;
+            border: 1px solid #EEE1E0;
             border-radius: 15px;
             overflow: hidden;
             display: flex;
@@ -275,9 +276,10 @@
             height: 0 !important;
             flex: 0 0 auto !important;
             overflow: hidden;
-            background: #f3f3f3;
-            border-top-left-radius: 15px;
-            border-top-right-radius: 15px;
+            background: #fff; /* match white covers — no gray seam above caption */
+            border-radius: 0;
+            line-height: 0;
+            font-size: 0;
         }
         .properties-img a {
             position: absolute;
@@ -288,7 +290,15 @@
             width: 100% !important;
             height: 100% !important;
             object-fit: cover !important;
+            object-position: center top;
             display: block;
+            border: 0 !important;
+            outline: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            /* Avoid rounded img corners creating a hairline seam above caption */
+            border-radius: 0 !important;
+            vertical-align: top;
         }
         .properties-caption,
         .properties-caption.properties-caption2 {
@@ -297,10 +307,9 @@
             box-sizing: border-box;
             background: #fff;
             padding: 14px 16px 12px !important;
-            border: 1px solid #EEE1E0;
-            border-top: 0;
-            border-bottom-left-radius: 15px;
-            border-bottom-right-radius: 15px;
+            /* border lives on .properties-card so white covers don't look detached */
+            border: 0 !important;
+            border-radius: 0 !important;
             flex: 1 1 auto;
             display: flex;
             flex-direction: column;

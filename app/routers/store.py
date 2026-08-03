@@ -1,6 +1,7 @@
 from math import ceil
 import json
 import re
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
@@ -48,7 +49,15 @@ async def _download_token_for(
 
 
 def _tojson(value) -> Markup:
-    return Markup(json.dumps(value, ensure_ascii=False))
+    def _default(obj):
+        if isinstance(obj, Decimal):
+            # Prefer int for whole toman amounts in JSON-LD
+            if obj == obj.to_integral_value():
+                return int(obj)
+            return float(obj)
+        raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+    return Markup(json.dumps(value, ensure_ascii=False, default=_default))
 
 
 templates.env.globals["cover_url"] = _cover_url
