@@ -5,9 +5,67 @@
 {% if message == 'created' %}<div class="msg">دسته ایجاد شد.</div>
 {% elif message == 'saved' %}<div class="msg">ذخیره شد.</div>
 {% elif message == 'deleted' %}<div class="msg">حذف شد.</div>
+{% elif message == 'bulk_assigned' %}
+<div class="msg">دسته(ها) به {{ bulk_books or '?' }} کتاب اعمال شد
+    {% if bulk_links %} ({{ bulk_links }} دسته){% endif %}.</div>
 {% elif message %}<div class="msg">{{ message }}</div>{% endif %}
 {% if error == 'empty_name' %}<div class="msg" style="background:#fecaca;color:#991b1b;">نام دسته الزامی است.</div>
+{% elif error == 'bulk_no_cats' %}<div class="msg" style="background:#fecaca;color:#991b1b;">حداقل یک دسته انتخاب کنید.</div>
+{% elif error == 'bulk_no_books' %}<div class="msg" style="background:#fecaca;color:#991b1b;">شناسه کتاب یا عبارت جستجو وارد کنید.</div>
+{% elif error == 'bulk_books_missing' %}<div class="msg" style="background:#fecaca;color:#991b1b;">هیچ کتابی با این شناسه‌ها پیدا نشد.</div>
 {% elif error %}<div class="msg" style="background:#fecaca;color:#991b1b;">{{ error }}</div>{% endif %}
+
+<div class="card" id="bulk-assign" style="margin-bottom:24px;max-width:720px;">
+    <h2 style="font-size:1.1rem;">اختصاص گروهی دسته به کتاب‌ها</h2>
+    <p class="form-hint" style="margin:0 0 12px;color:#64748b;font-size:.85rem;">
+        یک یا چند دسته را به تعداد زیادی کتاب یکجا اضافه کنید.
+        شناسه‌ها را با ویرگول بنویسید یا بازه بگذارید (مثلاً <code dir="ltr">12, 45, 100-250</code>).
+        اگر فقط جستجو پر باشد، روی همهٔ نتایج آن جستجو اعمال می‌شود.
+    </p>
+    <form method="post" action="/admin/categories/bulk-assign" class="admin-form"
+          onsubmit="return confirm('دسته‌های انتخاب‌شده به کتاب‌های مشخص‌شده اعمال شود؟');">
+        <div class="form-grid">
+            <div class="form-field full">
+                <label>دسته‌ها</label>
+                <div class="category-checks">
+                    {% for cat in categories %}
+                    <label class="form-check" style="margin:0;">
+                        <input type="checkbox" name="category_ids" value="{{ cat.id }}">
+                        {{ cat.name }}
+                    </label>
+                    {% else %}
+                    <span style="color:#64748b;font-size:.85rem;">ابتدا یک دسته بسازید.</span>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="form-field full">
+                <label for="bulk_book_ids">شناسه کتاب‌ها</label>
+                <textarea id="bulk_book_ids" name="book_ids" rows="3" dir="ltr"
+                          placeholder="12, 45, 100-250"></textarea>
+            </div>
+            <div class="form-field full">
+                <label for="bulk_search_q">یا جستجو در کتاب‌ها (عنوان / نویسنده / ناشر / ISBN…)</label>
+                <input id="bulk_search_q" name="search_q" placeholder="مثلاً نام ناشر یا بخش عنوان">
+            </div>
+            <div class="form-field full">
+                <label>حالت اعمال</label>
+                <div class="category-checks">
+                    <label class="form-check" style="margin:0;">
+                        <input type="radio" name="mode" value="add" checked>
+                        اضافه کردن (دسته‌های قبلی کتاب حفظ شوند)
+                    </label>
+                    <label class="form-check" style="margin:0;">
+                        <input type="radio" name="mode" value="replace">
+                        جایگزینی (فقط همین دسته‌ها روی کتاب‌ها بماند)
+                    </label>
+                </div>
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn" type="submit" {% if not categories %}disabled{% endif %}>اعمال گروهی</button>
+        </div>
+    </form>
+</div>
 
 <div class="card" style="margin-bottom:24px;max-width:640px;">
     <h2 style="font-size:1.1rem;">دسته جدید</h2>

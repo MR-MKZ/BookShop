@@ -54,6 +54,7 @@ from app.models import (
     ScraperRunStatus,
     User,
     UserRole,
+    book_categories,
 )
 from app.routers.media import check_file_exists, signer
 from app.services.checkout_helpers import get_download_ttl_hours
@@ -335,22 +336,34 @@ def _file_ext(filename: str | None) -> str:
     return filename.rsplit(".", 1)[-1].lower().strip()
 
 
-def _parse_book_ids(raw: str) -> list[int]:
+def _parse_book_ids(raw: str, *, max_ids: int = 50_000) -> list[int]:
+    """Parse `12, 45, 100-120` (ranges inclusive). Caps total unique ids."""
     ids: list[int] = []
     for part in re.split(r"[\s,;]+", (raw or "").strip()):
         if not part:
+            continue
+        m = re.fullmatch(r"(\d+)\s*-\s*(\d+)", part)
+        if m:
+            start, end = int(m.group(1)), int(m.group(2))
+            if start > end:
+                start, end = end, start
+            # Soft-cap a single range so a typo like 1-9999999 cannot explode memory
+            if end - start + 1 > max_ids:
+                end = start + max_ids - 1
+            ids.extend(range(start, end + 1))
             continue
         try:
             ids.append(int(part))
         except ValueError:
             continue
-    # Preserve order, unique
     seen: set[int] = set()
     out: list[int] = []
     for i in ids:
         if i not in seen:
             seen.add(i)
             out.append(i)
+            if len(out) >= max_ids:
+                break
     return out
 
 
@@ -2534,7 +2547,134 @@ async def admin_categories(
             "categories": cats,
             "message": request.query_params.get("msg"),
             "error": request.query_params.get("error"),
+            "bulk_books": request.query_params.get("books"),
+            "bulk_links": request.query_params.get("links"),
         },
+    )
+
+
+@router.post("/categories/bulk-assign")
+async def admin_categories_bulk_assign(
+    request: Request,
+    book_ids: str = Form(""),
+    search_q: str = Form(""),
+    mode: str = Form("add"),
+    db: AsyncSession = Depends(get_async_db),
+    admin: User = Depends(require_admin),
+):
+    """Add (or replace) one/more categories on a large set of books."""
+    from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+    form = await request.form()
+    category_ids: list[int] = []
+    seen_c: set[int] = set()
+    for raw in form.getlist("category_ids"):
+        try:
+            cid = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if cid not in seen_c:
+            seen_c.add(cid)
+            category_ids.append(cid)
+
+    if not category_ids:
+        return RedirectResponse(
+            url="/admin/categories?error=bulk_no_cats",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    cats = list(
+        (
+            await db.execute(select(Category).where(Category.id.in_(category_ids)))
+        )
+        .scalars()
+        .all()
+    )
+    if not cats:
+        return RedirectResponse(
+            url="/admin/categories?error=bulk_no_cats",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    valid_cat_ids = [c.id for c in cats]
+
+    explicit_ids = _parse_book_ids(book_ids)
+    search_q = (search_q or "").strip()
+    search_ids: list[int] = []
+    if search_q:
+        filters = _book_search_filters(search_q)
+        where = and_(*filters) if filters else True
+        search_ids = list(
+            (
+                await db.execute(
+                    select(Book.id)
+                    .where(where)
+                    .order_by(Book.id.asc())
+                    .limit(50_000)
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    if explicit_ids and search_ids:
+        search_set = set(search_ids)
+        ids = [i for i in explicit_ids if i in search_set]
+    elif explicit_ids:
+        ids = explicit_ids
+    else:
+        ids = search_ids
+
+    if not ids:
+        return RedirectResponse(
+            url="/admin/categories?error=bulk_no_books",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    existing = list(
+        (
+            await db.execute(
+                select(Book.id).where(Book.id.in_(ids)).order_by(Book.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    if not existing:
+        return RedirectResponse(
+            url="/admin/categories?error=bulk_books_missing",
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    mode = (mode or "add").strip().lower()
+    if mode == "replace":
+        await db.execute(
+            book_categories.delete().where(
+                book_categories.c.book_id.in_(existing)
+            )
+        )
+
+    pairs = [
+        {"book_id": bid, "category_id": cid}
+        for bid in existing
+        for cid in valid_cat_ids
+    ]
+    chunk = 800
+    for i in range(0, len(pairs), chunk):
+        batch = pairs[i : i + chunk]
+        stmt = (
+            pg_insert(book_categories)
+            .values(batch)
+            .on_conflict_do_nothing(index_elements=["book_id", "category_id"])
+        )
+        await db.execute(stmt)
+
+    await db.commit()
+    return RedirectResponse(
+        url=(
+            f"/admin/categories?msg=bulk_assigned"
+            f"&books={len(existing)}&links={len(valid_cat_ids)}"
+        ),
+        status_code=status.HTTP_303_SEE_OTHER,
     )
 
 
