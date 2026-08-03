@@ -232,12 +232,29 @@ class BookScraper:
             logger.error(f"Failed to finish scraper run status: {e}")
 
     async def get_total_pages(self, session: aiohttp.ClientSession) -> int:
-        """Auto-detects the last page number."""
+        """Auto-detects the last page number from explore paging links."""
         logger.info("Detecting total pages...")
         url = f"{self.base_url}/explore/page/1"
-        html = await self.fetch(session, url)
+        html = None
+        for attempt in range(max(1, self.args.retries)):
+            html = await self.fetch(session, url)
+            if html:
+                break
+            logger.warning(
+                "Explore page fetch failed (attempt %s/%s): %s",
+                attempt + 1,
+                self.args.retries,
+                url,
+            )
+            if attempt < self.args.retries - 1:
+                await asyncio.sleep(2**attempt)
+
         if not html:
-            return 1
+            raise RuntimeError(
+                f"Cannot detect total pages — failed to fetch {url}. "
+                "Check outbound HTTPS from this host to asbook.ir "
+                "(firewall/DNS/proxy), then retry."
+            )
 
         soup = BeautifulSoup(html, "lxml")
         paging_links = soup.select(".paging a")
@@ -257,6 +274,10 @@ class BookScraper:
                 if num > last_page:
                     last_page = num
 
+        if last_page <= 1:
+            logger.warning(
+                "Paging links not found or only page 1 — check asbook HTML (.paging a)"
+            )
         logger.info(f"Total pages detected: {last_page}")
         return last_page
 
@@ -273,12 +294,27 @@ class BookScraper:
                         elif response.status == 404:
                             return None
                         else:
+                            logger.warning(
+                                "HTTP %s for %s (attempt %s/%s)",
+                                response.status,
+                                url,
+                                attempt + 1,
+                                self.args.retries,
+                            )
                             wait_time = 0.5 if self.args.turbo else (2**attempt)
                             if attempt < self.args.retries - 1:
                                 await asyncio.sleep(wait_time)
-                except Exception:
+                except Exception as e:
+                    logger.warning(
+                        "Fetch error %s (attempt %s/%s): %s",
+                        url,
+                        attempt + 1,
+                        self.args.retries,
+                        e,
+                    )
                     if attempt < self.args.retries - 1:
                         await asyncio.sleep(0.5)
+            logger.error("Giving up fetching %s after %s attempts", url, self.args.retries)
             return None
 
     async def fetch_bytes(self, session: aiohttp.ClientSession, url: str) -> bytes | None:
@@ -297,7 +333,14 @@ class BookScraper:
                             wait_time = 0.5 if self.args.turbo else (2**attempt)
                             if attempt < self.args.retries - 1:
                                 await asyncio.sleep(wait_time)
-                except Exception:
+                except Exception as e:
+                    logger.warning(
+                        "Fetch-bytes error %s (attempt %s/%s): %s",
+                        url,
+                        attempt + 1,
+                        self.args.retries,
+                        e,
+                    )
                     if attempt < self.args.retries - 1:
                         await asyncio.sleep(0.5)
             return None
