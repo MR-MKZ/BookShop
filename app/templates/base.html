@@ -1,12 +1,12 @@
 <!doctype html>
-<html class="no-js" lang="fa" dir="rtl">
+<html class="no-js" lang="fa-IR" dir="rtl">
 
 <head>
     <meta charset="utf-8">
     <meta http-equiv="x-ua-compatible" content="ie=edge">
     {% set site_name = "لامابوک" %}
     {% set site_tagline = "مرجع دانلود کتاب‌های الکترونیکی خارجی" %}
-    {% set site_description = "خرید و دانلود کتاب‌های الکترونیکی خارجی در موضوعات متنوع؛ دسترسی آسان به هزاران ایبوک ارزشمند." %}
+    {% set site_description = "خرید و دانلود نسخه کامل کتاب‌های الکترونیکی خارجی؛ جستجو با عنوان کتاب، نویسنده، ISBN و شابک در لامابوک." %}
     {% set site_origin = (request.base_url|string).rstrip('/') %}
     <title>{% block title %}{{ site_name }} — {{ site_tagline }}{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -21,12 +21,16 @@
     <meta name="application-name" content="{{ site_name }}">
     <meta name="apple-mobile-web-app-title" content="{{ site_name }}">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
     <link rel="canonical" href="{% block canonical_url %}{{ site_origin }}{{ request.url.path }}{% endblock %}">
+    <link rel="alternate" hreflang="fa-IR" href="{{ self.canonical_url() }}">
+    <link rel="alternate" hreflang="x-default" href="{{ self.canonical_url() }}">
     <link rel="apple-touch-icon" href="{{ site_origin }}/static/img/logo/favicon.png">
 
     <meta property="og:type" content="{% block og_type %}website{% endblock %}">
     <meta property="og:site_name" content="{{ site_name }}">
     <meta property="og:locale" content="fa_IR">
+    <meta property="og:locale:alternate" content="en_US">
     <meta property="og:title" content="{% block og_title %}{{ self.title() }}{% endblock %}">
     <meta property="og:description" content="{% block og_description %}{{ self.meta_description() }}{% endblock %}">
     <meta property="og:url" content="{% block og_url %}{{ self.canonical_url() }}{% endblock %}">
@@ -49,17 +53,38 @@
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "WebSite",
-      "name": "لامابوک",
-      "alternateName": "Lamabook",
-      "url": "{{ site_origin }}",
-      "description": "خرید و دانلود کتاب‌های الکترونیکی خارجی در موضوعات متنوع؛ دسترسی آسان به هزاران ایبوک ارزشمند.",
-      "inLanguage": "fa-IR",
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": "{{ site_origin }}/search?q={search_term_string}",
-        "query-input": "required name=search_term_string"
-      }
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "{{ site_origin }}/#organization",
+          "name": "لامابوک",
+          "alternateName": "Lamabook",
+          "url": "{{ site_origin }}",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "{{ site_origin }}/static/img/logo/favicon.png"
+          },
+          "description": "{{ site_description }}"
+        },
+        {
+          "@type": "WebSite",
+          "@id": "{{ site_origin }}/#website",
+          "name": "لامابوک",
+          "alternateName": "Lamabook",
+          "url": "{{ site_origin }}",
+          "description": "{{ site_description }}",
+          "inLanguage": "fa-IR",
+          "publisher": { "@id": "{{ site_origin }}/#organization" },
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": {
+              "@type": "EntryPoint",
+              "urlTemplate": "{{ site_origin }}/search?q={search_term_string}"
+            },
+            "query-input": "required name=search_term_string"
+          }
+        }
+      ]
     }
     </script>
     {% endblock %}
@@ -1796,7 +1821,7 @@
                                             <a href="/"><img src="/static/img/logo/logo.png" alt="لامابوک"></a>
                                         </div>
                                         <form action="/search" method="get" class="form-box" id="header-search-form">
-                                            <input type="text" name="q" id="header-search-input" class="auto-dir" placeholder="جستجوی کتاب، نویسنده یا ناشر..." value="{{ query|default('') }}" autocomplete="off">
+                                            <input type="text" name="q" id="header-search-input" class="auto-dir" placeholder="عنوان کتاب ، نویسنده ، ISBN ، شابک و..." value="{{ query|default('') }}" autocomplete="off">
                                             <div class="search-icon">
                                                 <button type="submit" id="header-search-btn" class="header-search-action" aria-label="جستجو">
                                                     <i class="ti-search" id="header-search-icon"></i>

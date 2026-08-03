@@ -1,6 +1,6 @@
 """Add unique SEO slug for books (English-title URLs)
 
-Revision ID: a1b2c3d4e5f6
+Revision ID: g7h8i9j0k1l2
 Revises: f6a7b8c9d0e1
 Create Date: 2026-08-03 20:30:00.000000
 
@@ -11,7 +11,7 @@ import hashlib
 import re
 
 
-revision = "a1b2c3d4e5f6"
+revision = "g7h8i9j0k1l2"
 down_revision = "f6a7b8c9d0e1"
 branch_labels = None
 depends_on = None

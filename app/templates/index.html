@@ -1,7 +1,36 @@
 {% extends "base.html" %}
 {% from "macros.html" import book_card %}
 
-{% block title %}لامابوک — مرجع دانلود کتاب‌های الکترونیکی خارجی{% endblock %}
+{% block title %}خرید و دانلود کتاب الکترونیکی خارجی — لامابوک{% endblock %}
+
+{% block meta_description %}خرید و دانلود نسخه کامل کتاب‌های الکترونیکی خارجی از لامابوک. جستجو با عنوان کتاب، نویسنده، ISBN و شابک؛ دسترسی سریع به هزاران ایبوک تخصصی و عمومی.{% endblock %}
+
+{% block canonical_url %}{{ site_origin }}/{% endblock %}
+
+{% block json_ld %}
+{{ super() }}
+{% if books %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": "جدیدترین کتاب‌های لامابوک",
+  "itemListOrder": "https://schema.org/ItemListOrderDescending",
+  "numberOfItems": {{ books|length }},
+  "itemListElement": [
+    {%- for book in books %}
+    {
+      "@type": "ListItem",
+      "position": {{ loop.index }},
+      "url": {{ (site_origin ~ book.path)|tojson }},
+      "name": {{ book.display_title|tojson }}
+    }{% if not loop.last %},{% endif %}
+    {%- endfor %}
+  ]
+}
+</script>
+{% endif %}
+{% endblock %}
 
 {% block content %}
 <div class="slider-area hero-slider-wrap">
@@ -28,14 +57,14 @@
                     <div class="hero-caption hero-search-caption text-center">
                         <h1 data-animation="fadeInUp" data-delay=".2s">لامابوک</h1>
                         <p data-animation="fadeInUp" data-delay=".4s">مرجع دانلود کتاب‌های الکترونیکی خارجی</p>
-                        <form action="/search" method="get" class="hero-search-form" data-animation="fadeInUp" data-delay=".65s">
+                        <form action="/search" method="get" class="hero-search-form" data-animation="fadeInUp" data-delay=".65s" role="search">
                             <input type="text"
                                    name="q"
                                    class="auto-dir hero-search-input"
-                                   placeholder="جستجوی کتاب، نویسنده یا ناشر..."
+                                   placeholder="عنوان کتاب ، نویسنده ، ISBN ، شابک و..."
                                    value="{{ query|default('') }}"
                                    autocomplete="off"
-                                   aria-label="جستجوی کتاب">
+                                   aria-label="عنوان کتاب ، نویسنده ، ISBN ، شابک و...">
                             <button type="submit" class="hero-search-btn" aria-label="جستجو">
                                 <i class="ti-search"></i>
                                 <span>جستجو</span>

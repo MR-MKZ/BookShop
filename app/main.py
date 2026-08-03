@@ -10,7 +10,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.config import settings
 from app.database import AsyncSessionLocal
-from app.routers import admin, auth, cart, checkout, media, payment, store
+from app.routers import admin, auth, cart, checkout, media, payment, seo, store
 from app.routers.admin import AdminAuthRedirect
 from app.routers.cart import cart_count_for_request
 from app.utils.security import safe_next_url
@@ -96,6 +96,7 @@ templates.env.globals["static_url"] = lambda path: f"/static/{str(path).lstrip('
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(store.router, tags=["store"])
+app.include_router(seo.router, tags=["seo"])
 app.include_router(cart.router, tags=["cart"])
 app.include_router(checkout.router, tags=["checkout"])
 app.include_router(payment.router, tags=["payment"])

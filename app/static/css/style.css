@@ -1675,6 +1675,15 @@ hr {
     line-height: 1.4
 }
 
+.slider-area .hero-caption.hero-caption2 h1.search-page-heading {
+    color: #fff;
+    font-size: 50px;
+    display: block;
+    font-weight: 700;
+    line-height: 1.4;
+    margin: 0;
+}
+
 @media only screen and (min-width: 768px) and (max-width: 991px) {
     .slider-area .hero-caption.hero-caption2 h2 {
         font-size: 43px

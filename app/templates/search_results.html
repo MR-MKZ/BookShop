@@ -1,17 +1,55 @@
 {% extends "base.html" %}
 {% from "macros.html" import book_card, page_pagination %}
 
-{% block title %}جستجو{% if query %}: {{ query }}{% endif %} — لامابوک{% endblock %}
+{% block title %}
+{%- if query -%}
+خرید و دانلود کتاب {{ query }} — نتایج جستجو | لامابوک
+{%- else -%}
+جستجو و دانلود کتاب الکترونیکی — لامابوک
+{%- endif -%}
+{% endblock %}
 
 {% block meta_description %}
 {%- if query -%}
-نتایج جستجو برای «{{ query }}» در لامابوک — مرجع دانلود کتاب‌های الکترونیکی خارجی.
+نتایج جستجو برای «{{ query }}» در لامابوک — خرید و دانلود نسخه کامل کتاب با عنوان، نویسنده، ISBN و شابک.
 {%- else -%}
-جستجو و دانلود کتاب‌های الکترونیکی خارجی در لامابوک؛ دسترسی آسان به هزاران ایبوک ارزشمند.
+جستجو در کتاب‌های الکترونیکی لامابوک با عنوان کتاب، نویسنده، ISBN و شابک؛ دانلود سریع ایبوک‌های خارجی.
+{%- endif -%}
+{% endblock %}
+
+{% block robots %}
+{%- if page and page > 1 -%}
+noindex, follow
+{%- else -%}
+index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1
 {%- endif -%}
 {% endblock %}
 
 {% block canonical_url %}{{ site_origin }}/search{% if query %}?q={{ query|urlencode }}{% endif %}{% endblock %}
+
+{% block json_ld %}
+{{ super() }}
+{% if books %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": {% if query %}{{ ("نتایج جستجو: " ~ query)|tojson }}{% else %}"فهرست کتاب‌های لامابوک"{% endif %},
+  "numberOfItems": {{ total|default(books|length) }},
+  "itemListElement": [
+    {%- for book in books %}
+    {
+      "@type": "ListItem",
+      "position": {{ ((page|default(1)) - 1) * 24 + loop.index }},
+      "url": {{ (site_origin ~ book.path)|tojson }},
+      "name": {{ book.display_title|tojson }}
+    }{% if not loop.last %},{% endif %}
+    {%- endfor %}
+  ]
+}
+</script>
+{% endif %}
+{% endblock %}
 
 {% block content %}
 <div class="slider-area">
@@ -20,11 +58,11 @@
             <div class="row">
                 <div class="col-xl-12">
                     <div class="hero-caption hero-caption2">
-                        <h2>نتایج جستجو</h2>
+                        <h1 class="search-page-heading">نتایج جستجو</h1>
                         {% if query %}
                             <p>{{ total }} نتیجه برای «{{ query }}»</p>
                         {% else %}
-                            <p>عنوان، نویسنده یا ناشر را جستجو کنید</p>
+                            <p>عنوان کتاب، نویسنده، ISBN یا شابک را جستجو کنید</p>
                         {% endif %}
                     </div>
                 </div>
@@ -40,10 +78,10 @@
                 <input type="text"
                        name="q"
                        class="auto-dir"
-                       placeholder="جستجو در کتاب‌ها..."
+                       placeholder="عنوان کتاب ، نویسنده ، ISBN ، شابک و..."
                        value="{{ query }}"
                        autocomplete="off"
-                       aria-label="جستجوی کتاب">
+                       aria-label="عنوان کتاب ، نویسنده ، ISBN ، شابک و...">
                 <button type="submit" class="listing-search-compact-btn" aria-label="جستجو">
                     <i class="ti-search"></i>
                 </button>
@@ -63,11 +101,11 @@
                                 <i class="fas fa-search"></i>
                             </div>
                             {% if query %}
-                            <h3>نتیجه‌ای یافت نشد</h3>
+                            <h2>نتیجه‌ای یافت نشد</h2>
                             <p>برای «{{ query }}» چیزی پیدا نشد. املا را بررسی کنید یا عبارت کوتاه‌تری امتحان کنید.</p>
                             {% else %}
-                            <h3>عبارت جستجو را وارد کنید</h3>
-                            <p>از کادر بالا عنوان، نویسنده یا ناشر را جستجو کنید.</p>
+                            <h2>عبارت جستجو را وارد کنید</h2>
+                            <p>از کادر بالا عنوان کتاب، نویسنده، ISBN یا شابک را جستجو کنید.</p>
                             {% endif %}
                             <a href="/" class="btn">بازگشت به صفحه اصلی</a>
                         </div>

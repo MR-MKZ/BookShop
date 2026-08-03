@@ -16,33 +16,67 @@
 {% block og_image_alt %}جلد کتاب {{ book.seo_title_name }}{% endblock %}
 {% block og_image_size %}{% endblock %}
 {% block twitter_card %}summary_large_image{% endblock %}
+{% block canonical_url %}{{ site_origin }}{{ book.path }}{% endblock %}
 
 {% block json_ld %}
+{% set sale = round_toman(book.price) %}
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "Book",
-  "name": {{ book.seo_title_name|tojson }},
-  {% if book.title and book.title_en %}"alternateName": {{ book.title|tojson }},{% endif %}
-  {% if book.author %}"author": { "@type": "Person", "name": {{ book.author|tojson }} },{% endif %}
-  {% if book.description %}"description": {{ book.description|striptags|truncate(300, True, '')|tojson }},{% endif %}
-  {% if book.isbn %}"isbn": {{ book.isbn|tojson }},{% endif %}
-  {% if book.publisher %}"publisher": { "@type": "Organization", "name": {{ book.publisher|tojson }} },{% endif %}
-  {% if book.language %}"inLanguage": {{ book.language|tojson }},{% endif %}
-  {% if book.pages %}"numberOfPages": {{ book.pages }},{% endif %}
-  "image": {{ (site_origin ~ '/media/proxy/cover/' ~ book.folder_name ~ '/' ~ (book.cover_filename or 'cover.jpg'))|tojson }},
-  "url": {{ (site_origin ~ book.path)|tojson }},
-  "offers": {
-    "@type": "Offer",
-    "url": {{ (site_origin ~ book.path)|tojson }},
-    "availability": "https://schema.org/InStock",
-    "priceCurrency": "IRR"
-  },
-  "provider": {
-    "@type": "Organization",
-    "name": "لامابوک",
-    "url": {{ site_origin|tojson }}
-  }
+  "@graph": [
+    {
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "صفحه اصلی",
+          "item": {{ (site_origin ~ '/')|tojson }}
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "کتاب‌ها",
+          "item": {{ (site_origin ~ '/search')|tojson }}
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": {{ book.seo_title_name|tojson }},
+          "item": {{ (site_origin ~ book.path)|tojson }}
+        }
+      ]
+    },
+    {
+      "@type": ["Book", "Product"],
+      "@id": {{ (site_origin ~ book.path ~ '#book')|tojson }},
+      "name": {{ book.seo_title_name|tojson }},
+      {% if book.title and book.title_en %}"alternateName": {{ book.title|tojson }},{% endif %}
+      {% if book.author %}"author": { "@type": "Person", "name": {{ book.author|tojson }} },{% endif %}
+      {% if book.description %}"description": {{ book.description|striptags|truncate(300, True, '')|tojson }},{% endif %}
+      {% if book.isbn %}"isbn": {{ book.isbn|tojson }},{% endif %}
+      {% if book.isbn %}"gtin13": {{ book.isbn|replace('-', '')|tojson }},{% endif %}
+      {% if book.publisher %}"publisher": { "@type": "Organization", "name": {{ book.publisher|tojson }} },{% endif %}
+      {% if book.publisher %}"brand": { "@type": "Brand", "name": {{ book.publisher|tojson }} },{% endif %}
+      {% if book.language %}"inLanguage": {{ book.language|tojson }},{% endif %}
+      {% if book.pages %}"numberOfPages": {{ book.pages|tojson }},{% endif %}
+      "image": {{ (site_origin ~ '/media/proxy/cover/' ~ book.folder_name ~ '/' ~ (book.cover_filename or 'cover.jpg'))|tojson }},
+      "url": {{ (site_origin ~ book.path)|tojson }},
+      "offers": {
+        "@type": "Offer",
+        "url": {{ (site_origin ~ book.path)|tojson }},
+        "priceCurrency": "IRR",
+        "price": {{ (sale or 0)|tojson }},
+        "availability": "{% if book.has_pdf %}https://schema.org/InStock{% else %}https://schema.org/PreOrder{% endif %}",
+        "itemCondition": "https://schema.org/NewCondition"
+      },
+      "provider": {
+        "@type": "Organization",
+        "name": "لامابوک",
+        "url": {{ site_origin|tojson }}
+      }
+    }
+  ]
 }
 </script>
 {% endblock %}
