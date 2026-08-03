@@ -196,7 +196,7 @@
             border-bottom-color: #e2e8f0;
         }
         .panel-details[open] > summary::after { content: "▴"; }
-        .panel-details .panel-body { padding: 16px 18px 18px; }
+        .panel-details .panel-body { padding: 18px 18px 20px; }
         .panel-details .admin-form {
             max-width: 100%;
             border: 0;
@@ -236,7 +236,7 @@
         .cat-item .cat-meta { font-size: .82rem; color: #64748b; text-align: center; }
         .cat-item .cat-edit-hint { font-size: .78rem; color: #94a3b8; white-space: nowrap; }
         .cat-item[open] > summary { background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
-        .cat-item .panel-body { padding: 14px; }
+        .cat-item .panel-body { padding: 16px 14px 18px; }
         .toolbar {
             display: flex;
             flex-wrap: wrap;
@@ -453,10 +453,16 @@
             box-shadow: 0 1px 3px rgba(0,0,0,.06);
             box-sizing: border-box;
         }
+        .admin-form .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 18px 20px;
+            align-items: start;
+        }
         .admin-form .form-field {
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 8px;
             margin: 0;
             min-width: 0;
         }
@@ -468,28 +474,39 @@
             font-size: .85rem;
             font-weight: 600;
             color: #334155;
+            line-height: 1.35;
         }
         .admin-form .form-hint {
-            margin: 4px 0 0;
+            margin: 2px 0 0;
             font-size: .78rem;
             color: #64748b;
+            line-height: 1.45;
         }
         .admin-form .form-check {
             display: flex;
             align-items: center;
             gap: 8px;
-            margin: 4px 0 0;
+            margin: 0;
+            min-height: 42px;
             font-size: .9rem;
             font-weight: 500;
             color: #334155;
         }
         .admin-form .form-check input { margin: 0; }
+        .admin-form .form-field > input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+        .admin-form .form-field > select {
+            height: 42px;
+            min-height: 42px;
+            box-sizing: border-box;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
         .admin-form .form-actions {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
             align-items: center;
-            margin-top: 18px;
+            margin-top: 22px;
             padding-top: 16px;
             border-top: 1px solid #eef2f7;
         }
@@ -498,6 +515,14 @@
             padding: 8px 16px;
             font-size: .875rem;
         }
+        .panel-details .admin-form,
+        .admin-section .admin-form,
+        .cat-item .admin-form {
+            padding: 4px 0 0;
+        }
+        .panel-details .panel-body { padding: 18px 18px 20px; }
+        .cat-item .panel-body { padding: 16px 14px 18px; }
+        .admin-section > .section-lead { margin-bottom: 16px; }
         .filters input[type="text"],
         .filters input:not([type]),
         .filters input[type="date"],
@@ -539,7 +564,8 @@
             margin-top: 12px;
         }
         .admin-form .category-edit-grid {
-            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 18px 16px;
         }
         .dl-link-cell {
             display: flex;
@@ -1005,8 +1031,25 @@
                 flex: 1 1 100%;
                 max-width: 100%;
             }
-            .admin-form { padding: 14px; }
-            .admin-form .form-grid { grid-template-columns: 1fr; }
+            .admin-form .form-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+            .admin-form {
+                padding: 16px;
+            }
+            .panel-details .panel-body,
+            .cat-item .panel-body {
+                padding: 14px 12px 16px;
+            }
+            .admin-form .form-actions {
+                margin-top: 18px;
+                padding-top: 14px;
+            }
+            .admin-form .form-check {
+                min-height: 0;
+                padding: 4px 0;
+            }
             .admin-section,
             .panel-details,
             .empty-state {
@@ -1086,14 +1129,31 @@
                 flex: 0 0 auto;
                 width: auto;
             }
-            table .btn-row,
-            td .btn-row {
-                flex-wrap: wrap;
+            table .btn-sm,
+            td .btn-sm,
+            .btn-row.btn-row-sm > .btn,
+            .btn-row.btn-row-sm > a.btn,
+            .btn-row.btn-row-sm > button.btn {
+                min-width: 0;
+                flex: 1 1 auto;
+                white-space: nowrap;
+            }
+            .admin-modal-root {
+                padding: 10px;
+                align-items: flex-end;
             }
             .admin-modal {
                 width: 100%;
                 max-height: min(92vh, 100%);
                 padding: 14px;
+                border-radius: 14px 14px 0 0;
+            }
+            .admin-modal .modal-block {
+                padding: 12px;
+                margin-bottom: 8px;
+            }
+            .admin-modal .btn-row-sm .btn {
+                flex: 1 1 calc(50% - 6px);
             }
             .category-checks {
                 gap: 8px 12px;

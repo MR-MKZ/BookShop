@@ -72,7 +72,7 @@
                 <div class="btn-row btn-row-sm">
                     <a class="btn btn-sm btn-secondary" href="/admin/books/{{ book.id }}">ویرایش</a>
                     {% if not book.has_file_ready %}
-                    <button type="button" class="btn btn-sm js-quick-file" data-book-id="{{ book.id }}">فایل سریع</button>
+                    <button type="button" class="btn btn-sm js-quick-file" data-book-id="{{ book.id }}">مدیریت فایل</button>
                     {% endif %}
                 </div>
             </td>
@@ -96,7 +96,7 @@
     <div class="admin-modal" role="dialog" aria-modal="true" aria-labelledby="qf-title">
         <div class="admin-modal-head">
             <div>
-                <h2 id="qf-title">مدیریت فایل</h2>
+                <h2 id="qf-title">مدیریت فایل کتاب</h2>
                 <p class="modal-sub" id="qf-sub">—</p>
             </div>
             <button type="button" class="admin-modal-close" data-close-modal aria-label="بستن">×</button>
