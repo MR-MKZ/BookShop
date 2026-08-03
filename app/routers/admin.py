@@ -2500,9 +2500,12 @@ async def admin_save_pending_file_message(
 
 
 async def _unique_category_slug(
-    db: AsyncSession, name: str, exclude_id: int | None = None
+    db: AsyncSession,
+    name: str,
+    slug_hint: str | None = None,
+    exclude_id: int | None = None,
 ) -> str:
-    base = Category.slugify(name)
+    base = Category.slugify(slug_hint.strip() if slug_hint and slug_hint.strip() else name)
     slug = base
     n = 2
     while True:
@@ -2538,6 +2541,7 @@ async def admin_categories(
 @router.post("/categories/new")
 async def admin_category_create(
     name: str = Form(...),
+    slug: str = Form(""),
     description: str = Form(""),
     sort_order: int = Form(0),
     is_active: str | None = Form(None),
@@ -2550,11 +2554,11 @@ async def admin_category_create(
             url="/admin/categories?error=empty_name",
             status_code=status.HTTP_303_SEE_OTHER,
         )
-    slug = await _unique_category_slug(db, name)
+    final_slug = await _unique_category_slug(db, name, slug_hint=slug)
     db.add(
         Category(
             name=name,
-            slug=slug,
+            slug=final_slug,
             description=description.strip() or None,
             sort_order=sort_order,
             show_on_home=False,
@@ -2572,6 +2576,7 @@ async def admin_category_create(
 async def admin_category_edit(
     category_id: int,
     name: str = Form(...),
+    slug: str = Form(""),
     description: str = Form(""),
     sort_order: int = Form(0),
     is_active: str | None = Form(None),
@@ -2591,7 +2596,9 @@ async def admin_category_edit(
             status_code=status.HTTP_303_SEE_OTHER,
         )
     cat.name = name
-    cat.slug = await _unique_category_slug(db, name, exclude_id=cat.id)
+    cat.slug = await _unique_category_slug(
+        db, name, slug_hint=slug or name, exclude_id=cat.id
+    )
     cat.description = description.strip() or None
     cat.sort_order = sort_order
     cat.show_on_home = False

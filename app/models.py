@@ -331,15 +331,14 @@ class Category(Base):
 
     @staticmethod
     def slugify(name: str | None, max_len: int = 80) -> str:
+        """SEO path segment from category name (Persian/Unicode kept readable)."""
         text = (name or "").strip()
         text = re.sub(r"[^\w\s\-]+", "", text, flags=re.UNICODE)
-        text = re.sub(r"[\s\-]+", "-", text).strip("-_")
-        ascii_text = text.encode("ascii", "ignore").decode("ascii").strip("-_")
-        if ascii_text:
-            return ascii_text[:max_len].strip("-_") or "category"
-        # Persian / non-ASCII: hash-based fallback for URL safety
-        digest = hashlib.md5((name or "category").encode()).hexdigest()[:10]
-        return f"cat-{digest}"
+        text = re.sub(r"[\s_\-]+", "-", text).strip("-")
+        # Keep letters from any script (e.g. فارسی) — do not ASCII-strip to hashes
+        if text:
+            return text[:max_len].strip("-") or "category"
+        return "category"
 
     @property
     def path(self) -> str:

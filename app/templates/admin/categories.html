@@ -18,6 +18,10 @@
                 <input id="name" name="name" required>
             </div>
             <div class="form-field full">
+                <label for="slug">اسلاگ URL (اختیاری — خالی = از نام)</label>
+                <input id="slug" name="slug" dir="ltr" placeholder="مثلاً رمان یا fiction">
+            </div>
+            <div class="form-field full">
                 <label for="description">توضیح (اختیاری)</label>
                 <textarea id="description" name="description" rows="2"></textarea>
             </div>
@@ -56,8 +60,8 @@
                             <input name="name" value="{{ cat.name }}" required>
                         </div>
                         <div class="form-field">
-                            <label>اسلاگ</label>
-                            <input value="{{ cat.slug }}" dir="ltr" readonly disabled>
+                            <label>اسلاگ URL</label>
+                            <input name="slug" value="{{ cat.slug }}" dir="ltr" required>
                         </div>
                         <div class="form-field">
                             <label>ترتیب</label>
