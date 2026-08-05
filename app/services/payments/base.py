@@ -37,14 +37,17 @@ class PaymentGateway(Protocol):
         description: str,
         mobile: str | None = None,
         callback_url: str | None = None,
+        *,
+        cart_items: list[dict[str, Any]] | None = None,
+        customer: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Register payment; return dict with at least track_id."""
+        """Register payment; return dict with at least track_id (and optional redirect_url)."""
 
     async def verify_payment(self, track_id: int | str) -> dict[str, Any]:
-        """Verify payment; return dict with optional ref_id."""
+        """Verify payment; return dict with optional ref_id / amount_rial / order_id."""
 
     def start_url(self, track_id: int | str) -> str:
-        """Redirect URL for the user to pay."""
+        """Redirect URL for the user to pay (when redirect_url was not returned)."""
 
 
 _REGISTRY: dict[str, PaymentGateway] = {}

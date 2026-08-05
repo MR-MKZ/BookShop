@@ -10,7 +10,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.config import settings
 from app.database import AsyncSessionLocal
-from app.routers import admin, auth, cart, checkout, media, payment, seo, store
+from app.routers import admin, auth, cart, checkout, media, payment, seo, store, torob_api
 from app.routers.admin import AdminAuthRedirect
 from app.routers.cart import cart_count_for_request
 from app.utils.security import safe_next_url
@@ -115,6 +115,7 @@ app.include_router(checkout.router, tags=["checkout"])
 app.include_router(payment.router, tags=["payment"])
 app.include_router(media.router, tags=["media"])
 app.include_router(admin.router, tags=["admin"])
+app.include_router(torob_api.router, tags=["torob-api"])
 
 # Sitemap via fastapi-sitemap (dynamic rebuild; see app.services.sitemap)
 from app.services.sitemap import attach_sitemap  # noqa: E402

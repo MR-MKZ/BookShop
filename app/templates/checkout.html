@@ -411,6 +411,40 @@
                             </div>
                         </div>
 
+                        <div id="torobpay-address" class="torobpay-address" {% if not needs_address %}style="display:none;"{% endif %}>
+                            <h2 class="section-heading">آدرس (برای ترب‌پی)</h2>
+                            <div class="row">
+                                <div class="col-12 field">
+                                    <label for="address">آدرس<span class="req torobpay-req" {% if not needs_address %}style="display:none;"{% endif %}>*</span></label>
+                                    <input type="text" id="address" name="address"
+                                           value="{{ form.address or '' }}"
+                                           autocomplete="street-address"
+                                           data-torobpay-required="1">
+                                </div>
+                                <div class="col-md-4 field">
+                                    <label for="province">استان<span class="req torobpay-req" {% if not needs_address %}style="display:none;"{% endif %}>*</span></label>
+                                    <input type="text" id="province" name="province"
+                                           value="{{ form.province or '' }}"
+                                           autocomplete="address-level1"
+                                           data-torobpay-required="1">
+                                </div>
+                                <div class="col-md-4 field">
+                                    <label for="city">شهر<span class="req torobpay-req" {% if not needs_address %}style="display:none;"{% endif %}>*</span></label>
+                                    <input type="text" id="city" name="city"
+                                           value="{{ form.city or '' }}"
+                                           autocomplete="address-level2"
+                                           data-torobpay-required="1">
+                                </div>
+                                <div class="col-md-4 field">
+                                    <label for="postal_code">کد پستی<span class="req torobpay-req" {% if not needs_address %}style="display:none;"{% endif %}>*</span></label>
+                                    <input type="text" id="postal_code" name="postal_code" dir="ltr"
+                                           value="{{ form.postal_code or '' }}"
+                                           autocomplete="postal-code"
+                                           data-torobpay-required="1">
+                                </div>
+                            </div>
+                        </div>
+
                         {% if not current_user %}
                         <div class="account-box">
                             <div class="checkout-cap">
@@ -523,18 +557,38 @@
 <script>
 (function () {
     var cb = document.getElementById('create_account');
-    if (!cb) return;
-    var fields = document.querySelectorAll('.account-fields');
-    function sync() {
-        fields.forEach(function (el) {
-            el.style.display = cb.checked ? '' : 'none';
-            el.querySelectorAll('input').forEach(function (input) {
-                input.required = cb.checked;
+    if (cb) {
+        var fields = document.querySelectorAll('.account-fields');
+        function syncAccount() {
+            fields.forEach(function (el) {
+                el.style.display = cb.checked ? '' : 'none';
+                el.querySelectorAll('input').forEach(function (input) {
+                    input.required = cb.checked;
+                });
             });
-        });
+        }
+        cb.addEventListener('change', syncAccount);
+        syncAccount();
     }
-    cb.addEventListener('change', sync);
-    sync();
+
+    var addressBox = document.getElementById('torobpay-address');
+    if (!addressBox) return;
+    var reqMarks = addressBox.querySelectorAll('.torobpay-req');
+    var addrInputs = addressBox.querySelectorAll('[data-torobpay-required]');
+    function selectedGateway() {
+        var checked = document.querySelector('input[name="payment_gateway"]:checked');
+        return checked ? checked.value : '';
+    }
+    function syncAddress() {
+        var need = selectedGateway() === 'torobpay';
+        addressBox.style.display = need ? '' : 'none';
+        reqMarks.forEach(function (el) { el.style.display = need ? '' : 'none'; });
+        addrInputs.forEach(function (input) { input.required = need; });
+    }
+    document.querySelectorAll('input[name="payment_gateway"]').forEach(function (radio) {
+        radio.addEventListener('change', syncAddress);
+    });
+    syncAddress();
 })();
 </script>
 {% endblock %}

@@ -63,6 +63,54 @@ def _verify_matches_order(order: Order, verify: dict) -> bool:
     return True
 
 
+def _callback_success(params: dict, gateway_id: str | None) -> bool:
+    """Gateway-specific success signal from callback query/form params."""
+    if gateway_id == "torobpay" or str(params.get("state", "")).upper() in (
+        "OK",
+        "FAILED",
+    ):
+        return str(params.get("state", "")).upper() == "OK"
+    success = str(params.get("success", ""))
+    return success in ("1", "true", "True")
+
+
+async def _lookup_order(
+    db: AsyncSession,
+    params: dict,
+    gateway_id: str | None,
+) -> Order | None:
+    track_id = (
+        params.get("trackId")
+        or params.get("track_id")
+        or params.get("paymentToken")
+        or params.get("payment_token")
+    )
+    if track_id:
+        result = await db.execute(
+            select(Order)
+            .options(selectinload(Order.items))
+            .where(Order.payment_gateway_transaction_id == str(track_id))
+        )
+        order = result.scalar_one_or_none()
+        if order:
+            return order
+
+    # Torob Pay returnURL sends merchant transactionId (= order.id)
+    if gateway_id == "torobpay" or params.get("state") is not None:
+        txn = params.get("transactionId") or params.get("transaction_id")
+        if txn and str(txn).strip().isdigit():
+            result = await db.execute(
+                select(Order)
+                .options(selectinload(Order.items))
+                .where(
+                    Order.id == int(str(txn).strip()),
+                    Order.payment_gateway == "torobpay",
+                )
+            )
+            return result.scalar_one_or_none()
+    return None
+
+
 async def _handle_callback(
     request: Request,
     db: AsyncSession,
@@ -76,21 +124,8 @@ async def _handle_callback(
         except Exception:
             pass
 
-    success = str(params.get("success", ""))
-    track_id = params.get("trackId") or params.get("track_id")
     cart_sid = request.cookies.get(CART_COOKIE)
-
-    # Only trust trackId stored on the order — never promote a client orderId alone
-    if not track_id:
-        return RedirectResponse(url="/orders/recover", status_code=status.HTTP_303_SEE_OTHER)
-
-    result = await db.execute(
-        select(Order)
-        .options(selectinload(Order.items))
-        .where(Order.payment_gateway_transaction_id == str(track_id))
-    )
-    order = result.scalar_one_or_none()
-
+    order = await _lookup_order(db, params, gateway_id)
     if not order:
         return RedirectResponse(url="/orders/recover", status_code=status.HTTP_303_SEE_OTHER)
 
@@ -103,7 +138,13 @@ async def _handle_callback(
     if order.status == OrderStatus.PAID:
         return _thanks_redirect(order)
 
-    if success not in ("1", "true", "True"):
+    if not _callback_success(params, gw_id):
+        order.status = OrderStatus.FAILED
+        await db.commit()
+        return _thanks_redirect(order)
+
+    track_id = order.payment_gateway_transaction_id
+    if not track_id:
         order.status = OrderStatus.FAILED
         await db.commit()
         return _thanks_redirect(order)

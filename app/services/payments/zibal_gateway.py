@@ -21,7 +21,11 @@ class ZibalGateway:
         description: str,
         mobile: str | None = None,
         callback_url: str | None = None,
+        *,
+        cart_items: list[dict[str, Any]] | None = None,
+        customer: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        del cart_items, customer  # unused by Zibal
         try:
             data = await zibal.request_payment(
                 amount_toman=amount_toman,

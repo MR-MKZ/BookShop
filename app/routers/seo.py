@@ -33,6 +33,7 @@ Disallow: /checkout
 Disallow: /profile
 Disallow: /payment/
 Disallow: /download/
+Disallow: /torob_api/
 Disallow: /media/proxy/book/
 Disallow: /health
 Disallow: /docs

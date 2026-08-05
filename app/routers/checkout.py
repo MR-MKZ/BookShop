@@ -34,9 +34,10 @@ from app.routers.cart import (
     _cart_session_id,
     _clear_cart,
     _load_cart_items,
-    _owns_book,
     _owner_filter,
+    _owns_book,
 )
+from app.services import torobpay as torobpay_service
 from app.services.checkout_helpers import (
     COUPON_COOKIE,
     ORDER_ACCESS_COOKIE,
@@ -51,7 +52,7 @@ from app.services.checkout_helpers import (
     validate_email,
 )
 from app.services.downloads import download_url, make_download_token
-from app.services.payments import PaymentError, get_gateway, list_gateways
+from app.services.payments import GatewayInfo, PaymentError, get_gateway, list_gateways
 from app.utils.phone import normalize_iran_phone, validate_iran_phone
 from app.utils.price import format_price, round_toman
 from app.utils.security import cookie_kwargs
@@ -61,6 +62,46 @@ templates = Jinja2Templates(directory="app/templates")
 
 templates.env.globals["format_price"] = format_price
 templates.env.globals["round_toman"] = round_toman
+
+
+async def _gateways_for_checkout(total_toman: Decimal | int) -> list[GatewayInfo]:
+    """Filter gateways by Torob Pay eligibility / minimum amount."""
+    gateways = list_gateways()
+    amount_rial = int(total_toman) * 10
+    out: list[GatewayInfo] = []
+    for gw in gateways:
+        if gw.id == "torobpay":
+            if amount_rial < torobpay_service.MIN_AMOUNT_RIAL:
+                continue
+            if not await torobpay_service.is_eligible(amount_rial):
+                continue
+        out.append(gw)
+    return out
+
+
+def _book_category_name(book: Book) -> str:
+    cats = getattr(book, "categories", None) or []
+    if cats:
+        name = (cats[0].name or "").strip()
+        if name:
+            return name[:200]
+    return "کتاب"
+
+
+def _cart_items_for_gateway(books: list[Book]) -> list[dict]:
+    items: list[dict] = []
+    for book in books:
+        price_toman = int(round_toman(book.price))
+        items.append(
+            {
+                "id": book.id,
+                "name": book.display_title[:200],
+                "count": 1,
+                "amount": price_toman * 10,  # Rials for Torob Pay
+                "category": _book_category_name(book),
+            }
+        )
+    return items
 
 
 def _set_order_access_cookie(response: RedirectResponse, token: str) -> None:
@@ -92,6 +133,16 @@ async def _books_for_checkout(
         seen.add(book.id)
         to_buy.append(book)
     await db.flush()
+    if to_buy:
+        # Ensure categories are loaded for Torob Pay cartList.category
+        ids = [b.id for b in to_buy]
+        result = await db.execute(
+            select(Book)
+            .options(selectinload(Book.categories))
+            .where(Book.id.in_(ids))
+        )
+        by_id = {b.id: b for b in result.scalars().all()}
+        to_buy = [by_id[i] for i in ids if i in by_id]
     return to_buy
 
 
@@ -132,6 +183,7 @@ async def _checkout_context(
             "email": current_user.email or "",
         }
 
+    gateways = await _gateways_for_checkout(total)
     return {
         "request": request,
         "current_user": current_user,
@@ -146,7 +198,8 @@ async def _checkout_context(
         "coupon_input": (coupon_code if show_coupon_error else "") or "",
         "coupon_error": coupon_error if show_coupon_error else None,
         "clear_coupon_cookie": bool(coupon_error and coupon_code.strip()),
-        "gateways": list_gateways(),
+        "gateways": gateways,
+        "needs_address": any(g.id == "torobpay" for g in gateways),
         "error": error,
         "form": fd,
         "query": "",
@@ -227,6 +280,10 @@ async def place_order(
     last_name: str = Form(...),
     phone: str = Form(...),
     email: str = Form(...),
+    address: str = Form(""),
+    city: str = Form(""),
+    province: str = Form(""),
+    postal_code: str = Form(""),
     customer_note: str = Form(""),
     create_account: str | None = Form(None),
     password: str = Form(""),
@@ -239,6 +296,10 @@ async def place_order(
         "last_name": last_name,
         "phone": phone,
         "email": email,
+        "address": address,
+        "city": city,
+        "province": province,
+        "postal_code": postal_code,
         "customer_note": customer_note,
         "create_account": bool(create_account),
         "coupon_code": "",
@@ -325,6 +386,24 @@ async def place_order(
         gateway = get_gateway(gateway_id or None)
     except PaymentError as e:
         return await rerender(str(e))
+
+    address_norm = (address or "").strip()
+    city_norm = (city or "").strip()
+    province_norm = (province or "").strip()
+    postal_norm = (postal_code or "").strip()
+    if gateway.id == "torobpay":
+        if not address_norm:
+            return await rerender("آدرس برای پرداخت با ترب‌پی الزامی است")
+        if not city_norm:
+            return await rerender("شهر برای پرداخت با ترب‌پی الزامی است")
+        if not province_norm:
+            return await rerender("استان برای پرداخت با ترب‌پی الزامی است")
+        if not postal_norm:
+            return await rerender("کد پستی برای پرداخت با ترب‌پی الزامی است")
+        allowed = await _gateways_for_checkout(total)
+        if not any(g.id == "torobpay" for g in allowed):
+            return await rerender("ترب‌پی برای این سفارش در دسترس نیست")
+
     user = current_user
     login_token: str | None = None
     if want_account:
@@ -356,6 +435,10 @@ async def place_order(
         billing_last_name=last_name,
         billing_phone=phone_norm,
         billing_email=email_norm,
+        billing_address=address_norm or None,
+        billing_city=city_norm or None,
+        billing_province=province_norm or None,
+        billing_postal_code=postal_norm or None,
         customer_note=(customer_note or "").strip() or None,
         access_token=access_token,
         payment_gateway=gateway.id,
@@ -401,6 +484,14 @@ async def place_order(
         str(request.base_url).rstrip("/") + f"/payment/callback/{gateway.id}"
     )
     titles = "، ".join((b.title or "")[:40] for b in books[:3])
+    customer_ctx = {
+        "full_name": f"{first_name} {last_name}".strip(),
+        "address": address_norm,
+        "city": city_norm,
+        "province": province_norm,
+        "postal_code": postal_norm,
+        "registration_phone": phone_norm,
+    }
     try:
         data = await gateway.request_payment(
             amount_toman=int(total),
@@ -408,6 +499,8 @@ async def place_order(
             description=f"سفارش #{order.id}: {titles}",
             mobile=phone_norm,
             callback_url=callback,
+            cart_items=_cart_items_for_gateway(books),
+            customer=customer_ctx,
         )
     except PaymentError as e:
         order.status = OrderStatus.FAILED
@@ -418,8 +511,14 @@ async def place_order(
     order.payment_gateway_transaction_id = str(track_id)
     await db.commit()
 
+    pay_url = (data.get("redirect_url") or "") or gateway.start_url(track_id)
+    if not pay_url:
+        order.status = OrderStatus.FAILED
+        await db.commit()
+        return await rerender("آدرس پرداخت از درگاه دریافت نشد")
+
     response = RedirectResponse(
-        url=gateway.start_url(track_id),
+        url=pay_url,
         status_code=status.HTTP_303_SEE_OTHER,
     )
     _set_order_access_cookie(response, access_token)

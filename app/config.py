@@ -53,6 +53,14 @@ class Settings(BaseSettings):
     ZIBAL_MERCHANT: str = "zibal"
     ZIBAL_CALLBACK_URL: str = "http://localhost:8000/payment/callback/zibal"
 
+    # Torob Pay (credit / installment CPG) — register only when ENABLED + credentials set
+    TOROBPAY_ENABLED: bool = False
+    TOROBPAY_API_URL: str = "https://cpg.torobpay.com"
+    TOROBPAY_CLIENT_ID: str = ""
+    TOROBPAY_CLIENT_SECRET: str = ""
+    TOROBPAY_USERNAME: str = ""
+    TOROBPAY_PASSWORD: str = ""
+
     @field_validator("SECRET_KEY")
     @classmethod
     def secret_key_present(cls, v: str) -> str:
